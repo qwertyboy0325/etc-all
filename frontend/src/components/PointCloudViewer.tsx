@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, Suspense } from 'react'
 import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import { OrbitControls, Stats, Grid, GizmoHelper, GizmoViewport } from '@react-three/drei'
 import { Card, Spin, Alert, Typography, Space, Statistic, Button, Slider } from 'antd'
-import { RotateCcw, ZoomIn, ZoomOut, Maximize } from 'lucide-react'
+import { RotateCcw, Maximize } from 'lucide-react'
 import * as THREE from 'three'
 
 const { Title, Text } = Typography

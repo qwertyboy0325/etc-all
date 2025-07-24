@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Layout, Typography, Card, Button, Select, Space, message, Upload, Progress } from 'antd'
-import { Upload as UploadIcon, Eye, FileText, Refresh } from 'lucide-react'
+import { Upload as UploadIcon, Eye, FileText, RefreshCcw } from 'lucide-react'
 import PointCloudViewer from '../components/PointCloudViewer'
 import { 
   PointCloudData, 
@@ -244,7 +244,7 @@ const PointCloudViewerPage: React.FC = () => {
                     載入示例數據
                   </Button>
                   <Button
-                    icon={<Refresh size={16} />}
+                    icon={<RefreshCcw size={16} />}
                     onClick={loadFilesList}
                   >
                     刷新列表
