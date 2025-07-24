@@ -1,143 +1,158 @@
 import React from 'react';
-import { Layout, Typography, Button, Space, Card } from 'antd';
-import { Cloud, Database, Settings, Eye, FileText } from 'lucide-react';
+import { Layout, Card, Row, Col, Typography, Space, Button, Statistic } from 'antd';
+import { 
+  ProjectOutlined, 
+  UserOutlined, 
+  FileTextOutlined,
+  SettingOutlined 
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import ApiModeSwitch from '../components/ApiModeSwitch';
 
-const { Header, Content, Footer } = Layout;
-const { Title, Paragraph, Text } = Typography;
+const { Content } = Layout;
+const { Title, Text } = Typography;
 
 const Landing: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const quickActions = [
+    {
+      title: '專案管理',
+      description: '創建和管理點雲標注專案',
+      icon: <ProjectOutlined style={{ fontSize: '24px', color: '#1890ff' }} />,
+      action: () => navigate('/projects')
+    },
+    {
+      title: '任務管理', 
+      description: '查看和分配標注任務',
+      icon: <FileTextOutlined style={{ fontSize: '24px', color: '#52c41a' }} />,
+      action: () => navigate('/tasks')
+    },
+    {
+      title: '點雲查看器',
+      description: '查看和分析點雲數據',
+      icon: <UserOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />,
+      action: () => navigate('/viewer')
+    }
+  ];
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        background: '#fff',
-        borderBottom: '1px solid #f0f0f0',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Cloud size={32} style={{ color: '#1890ff', marginRight: '12px' }} />
-          <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-            ETC 點雲標注系統
-          </Title>
-        </div>
-        
-        <div style={{ marginLeft: 'auto' }}>
-          <Space>
-            <Button type="text" href="/">
-              首頁
-            </Button>
-            <Button type="text" href="/viewer">
-              點雲查看器
-            </Button>
-            <Button type="text" href="/tasks">
-              任務管理
-            </Button>
-          </Space>
-        </div>
-      </Header>
-
-      <Content style={{ background: '#f5f5f5' }}>
-        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <Title level={1}>
-              <Cloud size={48} style={{ color: '#1890ff', marginRight: '16px' }} />
-              ETC 點雲標注系統
+    <Layout style={{ minHeight: '100vh', background: '#f0f2f5' }}>
+      <Content style={{ padding: '50px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: '50px' }}>
+            <Title level={1} style={{ color: '#1890ff', marginBottom: '16px' }}>
+              歡迎使用 ETC 點雲標注系統
             </Title>
-            <Paragraph style={{ fontSize: '18px', color: '#666' }}>
-              專業的點雲數據標注平台，用於車種辨識AI模型訓練
-            </Paragraph>
+            <Text style={{ fontSize: '16px', color: '#666' }}>
+              高效的點雲車輛檢測標注平台，歡迎 {user?.fullName || user?.email}
+            </Text>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '40px' }}>
-            <Card>
-              <div style={{ textAlign: 'center' }}>
-                <Database size={32} style={{ color: '#52c41a', marginBottom: '16px' }} />
-                <Title level={4}>點雲數據管理</Title>
-                <Paragraph>
-                  支援 .npy/.npz 格式點雲文件上傳，提供高效的數據存儲和管理方案
-                </Paragraph>
-              </div>
-            </Card>
+          {/* Quick Actions */}
+          <Row gutter={[24, 24]} style={{ marginBottom: '50px' }}>
+            {quickActions.map((action, index) => (
+              <Col xs={24} sm={12} md={8} key={index}>
+                <Card 
+                  hoverable
+                  style={{ height: '200px', cursor: 'pointer' }}
+                  onClick={action.action}
+                  bodyStyle={{ 
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    textAlign: 'center'
+                  }}
+                >
+                  <Space direction="vertical" size="large">
+                    {action.icon}
+                    <div>
+                      <Title level={4} style={{ margin: '8px 0' }}>
+                        {action.title}
+                      </Title>
+                      <Text type="secondary">{action.description}</Text>
+                    </div>
+                  </Space>
+                </Card>
+              </Col>
+            ))}
+          </Row>
 
-            <Card>
-              <div style={{ textAlign: 'center' }}>
-                <Eye size={32} style={{ color: '#1890ff', marginBottom: '16px' }} />
-                <Title level={4}>3D 點雲查看器</Title>
-                <Paragraph>
-                  先進的3D渲染引擎，支持點雲可視化、交互控制和多種顯示模式
-                </Paragraph>
-              </div>
-            </Card>
+          {/* System Status */}
+          <Row gutter={[24, 24]} style={{ marginBottom: '30px' }}>
+            <Col xs={24} md={16}>
+              <Card title="📊 系統概覽" size="small">
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic title="活躍專案" value={3} suffix="個" />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic title="待處理任務" value={12} suffix="個" />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic title="本週完成" value={28} suffix="個" />
+                  </Col>
+                </Row>
+              </Card>
+            </Col>
+            <Col xs={24} md={8}>
+              <ApiModeSwitch showCard={true} />
+            </Col>
+          </Row>
 
-            <Card>
-              <div style={{ textAlign: 'center' }}>
-                <FileText size={32} style={{ color: '#722ed1', marginBottom: '16px' }} />
-                <Title level={4}>任務管理系統</Title>
-                <Paragraph>
-                  智能任務分配、進度追蹤，支援多用戶協作標注和工作流管理
-                </Paragraph>
-              </div>
-            </Card>
-
-            <Card>
-              <div style={{ textAlign: 'center' }}>
-                <Settings size={32} style={{ color: '#fa8c16', marginBottom: '16px' }} />
-                <Title level={4}>審核工作流</Title>
-                <Paragraph>
-                  完整的審核流程管理，確保標注數據的準確性和一致性
-                </Paragraph>
-              </div>
-            </Card>
-          </div>
-
-          <div style={{ textAlign: 'center' }}>
-            <Space size="large">
-              <Button type="primary" size="large" href="/viewer">
-                🎨 體驗點雲查看器
-              </Button>
-              <Button size="large" href="/tasks">
-                📋 任務管理
-              </Button>
-              <Button size="large">
-                📖 查看文檔
-              </Button>
+          {/* Quick Links */}
+          <Card title={
+            <Space>
+              <SettingOutlined />
+              <span>快速導航</span>
             </Space>
-          </div>
-
-          {/* Week 5 Development Status */}
-          <Card style={{ marginTop: '40px', background: '#f6ffed' }}>
-            <Title level={4} style={{ color: '#52c41a' }}>
-              🎉 Week 5 開發進度 - 任務管理系統
-            </Title>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-              <div>
-                <Text strong style={{ color: '#52c41a' }}>✅ 任務模型</Text>
-                <div style={{ fontSize: '12px', color: '#666' }}>完整的任務數據模型</div>
-              </div>
-              <div>
-                <Text strong style={{ color: '#52c41a' }}>✅ 任務服務</Text>
-                <div style={{ fontSize: '12px', color: '#666' }}>CRUD、分配、狀態管理</div>
-              </div>
-              <div>
-                <Text strong style={{ color: '#52c41a' }}>✅ 任務API</Text>
-                <div style={{ fontSize: '12px', color: '#666' }}>完整的RESTful端點</div>
-              </div>
-              <div>
-                <Text strong style={{ color: '#1890ff' }}>🚧 前端界面</Text>
-                <div style={{ fontSize: '12px', color: '#666' }}>任務管理界面開發中</div>
-              </div>
-            </div>
+          }>
+            <Row gutter={16}>
+              <Col span={6}>
+                <Button 
+                  type="link" 
+                  block 
+                  onClick={() => navigate('/projects')}
+                >
+                  專案列表
+                </Button>
+              </Col>
+              <Col span={6}>
+                <Button 
+                  type="link" 
+                  block 
+                  onClick={() => navigate('/tasks')}
+                >
+                  我的任務
+                </Button>
+              </Col>
+              <Col span={6}>
+                <Button 
+                  type="link" 
+                  block 
+                  onClick={() => navigate('/viewer')}
+                >
+                  點雲查看器
+                </Button>
+              </Col>
+              <Col span={6}>
+                <Button 
+                  type="link" 
+                  block 
+                  onClick={() => window.open('http://localhost:8000/api/v1/docs', '_blank')}
+                >
+                  API文檔
+                </Button>
+              </Col>
+            </Row>
           </Card>
         </div>
       </Content>
-
-      <Footer style={{ textAlign: 'center', background: '#fff', borderTop: '1px solid #f0f0f0' }}>
-        ETC Point Cloud Annotation System ©2024 Created by ETC Team
-        <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
-          🎯 Week 5: Task Management System - 開發進行中
-        </div>
-      </Footer>
     </Layout>
   );
 };

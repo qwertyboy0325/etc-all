@@ -1,9 +1,14 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
+import Login from './pages/Login';
 import PointCloudViewerPage from './pages/PointCloudViewer';
 import TaskManagement from './pages/TaskManagement';
+import AnnotationPage from './pages/AnnotationPage';
+import ProjectManagement from './pages/ProjectManagement';
 import './App.css';
 
 // Global error boundary component
@@ -48,15 +53,79 @@ class ErrorBoundary extends React.Component<
 function App() {
   return (
     <ErrorBoundary>
-      <ConfigProvider>
-        <Router>
+      <ConfigProvider
+        theme={{
+          token: {
+            colorPrimary: '#1890ff',
+          },
+        }}
+      >
+        <AuthProvider>
           <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/viewer" element={<PointCloudViewerPage />} />
-            <Route path="/projects/:projectId/tasks" element={<TaskManagement />} />
-            <Route path="/tasks" element={<TaskManagement />} />
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            
+            {/* Protected routes */}
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <Landing />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/viewer" 
+              element={
+                <ProtectedRoute>
+                  <PointCloudViewerPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/:projectId/tasks" 
+              element={
+                <ProtectedRoute>
+                  <TaskManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects/:projectId/tasks/:taskId/annotate" 
+              element={
+                <ProtectedRoute>
+                  <AnnotationPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/tasks" 
+              element={
+                <ProtectedRoute>
+                  <TaskManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/projects" 
+              element={
+                <ProtectedRoute>
+                  <ProjectManagement />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Catch all - redirect to login */}
+            <Route 
+              path="*" 
+              element={
+                <ProtectedRoute>
+                  <Landing />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
-        </Router>
+        </AuthProvider>
       </ConfigProvider>
     </ErrorBoundary>
   );
