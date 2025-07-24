@@ -195,8 +195,8 @@ const ProjectManagement: React.FC = () => {
           description: (createdProject as any).description || '',
           status: (createdProject as any).status || 'active',
           createdBy: (createdProject as any).created_by || user?.id || '1',
-          createdAt: (createdProject as any).created_at || new Date().toISOString(),
-          updatedAt: (createdProject as any).updated_at || new Date().toISOString(),
+          createdAt: (createdProject as any).created_at || (createdProject as any).createdAt || new Date().toISOString(),
+          updatedAt: (createdProject as any).updated_at || (createdProject as any).updatedAt || new Date().toISOString(),
           memberCount: 1,
           taskCount: (createdProject as any).total_tasks || 0,
           completedTasks: (createdProject as any).completed_tasks || 0,
@@ -204,6 +204,14 @@ const ProjectManagement: React.FC = () => {
             ? Math.round(((createdProject as any).completed_tasks / (createdProject as any).total_tasks) * 100) 
             : 0
         };
+
+        // Debug: 輸出創建的專案數據
+        console.log('Created project data:', {
+          originalResponse: createdProject,
+          processedProject: newProject,
+          createdAtValue: newProject.createdAt,
+          createdAtValid: !isNaN(new Date(newProject.createdAt).getTime())
+        });
 
         setProjects(prev => [newProject, ...prev]);
         message.success('專案創建成功');
@@ -317,7 +325,17 @@ const ProjectManagement: React.FC = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 120,
-      render: (date: string) => new Date(date).toLocaleDateString('zh-TW')
+      render: (date: string) => {
+        if (!date) return '-';
+        try {
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) return '-';
+          return dateObj.toLocaleDateString('zh-TW');
+        } catch (error) {
+          console.warn('Invalid date format:', date);
+          return '-';
+        }
+      }
     },
     {
       title: '操作',
