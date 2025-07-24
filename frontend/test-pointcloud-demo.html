@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETC 點雲查看器演示</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .demo-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .feature-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.completed {
+            background: #f6ffed;
+            color: #52c41a;
+        }
+        .status.in-progress {
+            background: #fff7e6;
+            color: #fa8c16;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #1890ff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #40a9ff;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎉 ETC 點雲查看器 - Week 4 完成！</h1>
+            <p>基於 Three.js 的 3D 點雲渲染系統開發完成</p>
+            <p>
+                <a href="http://localhost:5173" class="btn">啟動開發服務器</a>
+                <a href="http://localhost:5173/viewer" class="btn">直接體驗查看器</a>
+            </p>
+        </div>
+
+        <!-- Main Features -->
+        <div class="demo-card">
+            <h2>📋 Week 4 開發成果</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>🎨 3D 點雲渲染</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>使用 Three.js 實現高性能點雲顯示，支持大量點雲數據</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎮 交互控制</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>支持旋轉、縮放、平移等3D交互操作</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📁 文件整合</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>前端文件上傳與後端API完整整合</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚙️ 顯示控制</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>點大小調整、顏色顯示、網格等可視化選項</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="demo-card">
+            <h2>🔧 技術實現</h2>
+            
+            <h3>主要組件結構：</h3>
+            <div class="code-block">
+frontend/src/
+├── components/
+│   └── PointCloudViewer.tsx       # 3D 點雲查看器核心組件
+├── pages/
+│   └── PointCloudViewer.tsx       # 點雲查看器頁面
+├── utils/
+│   └── pointCloudLoader.ts        # 點雲數據載入工具
+└── App.tsx                        # 主應用（已更新路由）
+            </div>
+
+            <h3>核心功能特性：</h3>
+            <ul>
+                <li><strong>3D 渲染引擎</strong>: react-three-fiber + Three.js</li>
+                <li><strong>點雲處理</strong>: 支持 .npy/.npz 格式解析</li>
+                <li><strong>交互控制</strong>: OrbitControls 實現完整3D操作</li>
+                <li><strong>性能優化</strong>: BufferGeometry 高效渲染</li>
+                <li><strong>UI整合</strong>: Ant Design 組件庫</li>
+                <li><strong>狀態管理</strong>: React Hooks 本地狀態</li>
+            </ul>
+
+            <h3>已實現的API整合：</h3>
+            <ul>
+                <li>✅ 文件上傳: <code>POST /projects/{id}/files/upload</code></li>
+                <li>✅ 文件列表: <code>GET /projects/{id}/files</code></li>
+                <li>✅ 文件下載: <code>GET /projects/{id}/files/{file_id}/download</code></li>
+                <li>✅ 元數據解析: 自動提取點數、邊界框等信息</li>
+            </ul>
+        </div>
+
+        <!-- Demo Instructions -->
+        <div class="demo-card">
+            <h2>🚀 如何體驗</h2>
+            
+            <h3>1. 啟動開發環境：</h3>
+            <div class="code-block">
+# 啟動後端 API 服務器 (端口 8000)
+cd backend
+source venv/bin/activate
+python -m uvicorn app.main:app --reload
+
+# 啟動前端開發服務器 (端口 5173)
+cd frontend
+npm run dev
+            </div>
+
+            <h3>2. 使用步驟：</h3>
+            <ol>
+                <li>訪問 <a href="http://localhost:5173">http://localhost:5173</a> 進入主頁</li>
+                <li>點擊 "🎨 體驗點雲查看器" 或直接訪問 <a href="http://localhost:5173/viewer">/viewer</a></li>
+                <li>點擊 "載入示例數據" 查看示例點雲</li>
+                <li>嘗試上傳你自己的 .npy/.npz 點雲文件</li>
+                <li>使用滑鼠進行3D交互：左鍵旋轉、滾輪縮放、右鍵平移</li>
+                <li>調整顯示設置：點大小、顏色、網格等</li>
+            </ol>
+
+            <h3>3. 支持的文件格式：</h3>
+            <ul>
+                <li><strong>.npy</strong> - NumPy 二進制格式</li>
+                <li><strong>.npz</strong> - NumPy 壓縮格式</li>
+                <li><strong>.ply</strong> - 多邊形文件格式（計劃支持）</li>
+                <li><strong>.pcd</strong> - 點雲數據格式（計劃支持）</li>
+            </ul>
+        </div>
+
+        <!-- Week Progress -->
+        <div class="demo-card">
+            <h2>📈 開發進度總覽</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Week 1</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>基礎架構 + 數據庫設計</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Week 2</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>認證系統 + 項目管理</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Week 3</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>文件上傳 + 點雲處理</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Week 4</h3>
+                    <span class="status completed">✅ 完成</span>
+                    <p>3D 渲染 + 交互控制</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="demo-card" style="text-align: center; margin-top: 30px;">
+            <h3>🎯 下一步發展</h3>
+            <p>Week 5: 任務管理系統 | Week 6: 標注工具 | Week 7: 審核工作流</p>
+            <p style="color: #666; font-size: 14px;">
+                ETC Point Cloud Annotation System ©2024 | 
+                <strong>Week 4 Complete: Point Cloud Rendering</strong>
+            </p>
+        </div>
+    </div>
+</body>
+</html> 
