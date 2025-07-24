@@ -113,7 +113,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Fallback to mock API call
       const response = await new Promise<any>((resolve, reject) => {
         setTimeout(() => {
-          if (email === 'admin@etc.com' && password === 'admin123') {
+          if (email === 'admin@etc.com' && password === 'admin') {
             resolve({
               user: {
                 id: '1',
