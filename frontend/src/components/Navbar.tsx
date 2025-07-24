@@ -5,7 +5,8 @@ import {
   LogoutOutlined,
   SettingOutlined,
   CrownOutlined,
-  ToolOutlined
+  ToolOutlined,
+  DownOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, usePermissions } from '../contexts/AuthContext';
@@ -167,32 +168,68 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               </Button>
             </Space>
 
-            {/* API Mode Switch */}
-            <ApiModeSwitch compact={true} />
-
             {/* User Info */}
-            <Space>
-              <Tag 
-                icon={getRoleIcon()} 
-                color={getRoleColor()}
-                style={{ margin: 0 }}
-              >
-                {getRoleText()}
-              </Tag>
+            <Space style={{ marginLeft: 'auto' }}>
+              {/* Debug: 顯示當前用戶資訊 */}
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                用戶: {user?.email} | 權限: {user?.globalRole} | Token: {localStorage.getItem('token')?.substring(0, 20)}...
+              </Text>
               
-              <Dropdown 
-                menu={{ items: userMenuItems }}
-                placement="bottomRight"
-                arrow
+              {/* Debug: Quick Admin Login Button */}
+              {user?.globalRole !== 'admin' && (
+                <Button 
+                  size="small" 
+                  type="dashed" 
+                  onClick={async () => {
+                    logout();
+                    // 短暫延遲後跳轉到登入頁面並自動填入admin帳號
+                    setTimeout(() => {
+                      navigate('/login?email=admin@etc.com&password=admin');
+                    }, 100);
+                  }}
+                  style={{ fontSize: '10px', height: '24px' }}
+                >
+                  切換Admin
+                </Button>
+              )}
+              
+              {/* API Mode Switch */}
+              <ApiModeSwitch compact={true} />
+              
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'profile',
+                      label: '個人資料',
+                      icon: <UserOutlined />,
+                      onClick: () => navigate('/profile')
+                    },
+                    {
+                      key: 'settings',
+                      label: '系統設定',
+                      icon: <SettingOutlined />,
+                      onClick: () => navigate('/settings')
+                    },
+                    {
+                      type: 'divider'
+                    },
+                    {
+                      key: 'logout',
+                      label: '登出',
+                      icon: <LogoutOutlined />,
+                      danger: true,
+                      onClick: logout
+                    }
+                  ]
+                }}
+                trigger={['click']}
               >
-                <Button type="text" style={{ padding: '4px 8px' }}>
+                <Button type="text" style={{ height: '40px', padding: '0 12px' }}>
                   <Space>
-                    <Avatar 
-                      size="small" 
-                      icon={<UserOutlined />}
-                      style={{ backgroundColor: '#1890ff' }}
-                    />
-                    <Text strong>{user.fullName}</Text>
+                    <Avatar size="small" icon={<UserOutlined />} />
+                    <Text style={{ color: '#fff' }}>{user?.fullName || user?.email}</Text>
+                    <DownOutlined style={{ color: '#fff', fontSize: '10px' }} />
                   </Space>
                 </Button>
               </Dropdown>

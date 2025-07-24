@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Layout,
   Card,
@@ -20,7 +20,7 @@ import {
   LoginOutlined,
   UserAddOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const { Content } = Layout;
@@ -42,11 +42,25 @@ interface RegisterFormData {
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, register } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('login');
   const [loading, setLoading] = useState(false);
   const [loginForm] = Form.useForm();
   const [registerForm] = Form.useForm();
+
+  // Handle URL parameters for auto-fill
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const email = params.get('email');
+    const password = params.get('password');
+    
+    if (email && password) {
+      loginForm.setFieldsValue({ email, password });
+      // 自動提示用戶可以直接登入
+      message.info('已自動填入Admin帳號，請點擊登入', 3);
+    }
+  }, [location.search, loginForm]);
 
   // Handle login
   const handleLogin = async (values: LoginFormData) => {
