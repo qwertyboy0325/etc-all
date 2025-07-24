@@ -24,11 +24,13 @@ const { Option } = Select;
 interface ApiModeSwitchProps {
   showCard?: boolean;
   size?: 'small' | 'middle' | 'large';
+  compact?: boolean; // 新增compact模式，專為Navbar使用
 }
 
 const ApiModeSwitch: React.FC<ApiModeSwitchProps> = ({ 
   showCard = false,
-  size = 'middle' 
+  size = 'middle',
+  compact = false
 }) => {
   const [currentMode, setCurrentMode] = useState<ApiMode>(apiConfig.getMode());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -100,6 +102,49 @@ const ApiModeSwitch: React.FC<ApiModeSwitchProps> = ({
       console.error('❌ API連接測試錯誤:', error);
     }
   };
+
+  // 如果是compact模式（Navbar使用）
+  if (compact) {
+    return (
+      <Tooltip 
+        title={
+          <div>
+            <div><strong>當前模式:</strong> {API_MODE_DESCRIPTIONS[currentMode]}</div>
+            <div><strong>網路狀態:</strong> {isOnline ? '在線' : '離線'}</div>
+          </div>
+        } 
+        placement="bottomRight"
+      >
+        <Select
+          value={currentMode}
+          onChange={handleModeChange}
+          style={{ width: 120 }}
+          size="small"
+          bordered={false}
+          dropdownMatchSelectWidth={false}
+        >
+          <Option value="hybrid">
+            <Space size="small">
+              <ApiOutlined style={{ color: '#fa8c16' }} />
+              混合
+            </Space>
+          </Option>
+          <Option value="real">
+            <Space size="small">
+              <CloudOutlined style={{ color: '#52c41a' }} />
+              真實
+            </Space>
+          </Option>
+          <Option value="mock">
+            <Space size="small">
+              <DatabaseOutlined style={{ color: '#1890ff' }} />
+              模擬
+            </Space>
+          </Option>
+        </Select>
+      </Tooltip>
+    );
+  }
 
   const switchContent = (
     <Space direction="vertical" size="small">

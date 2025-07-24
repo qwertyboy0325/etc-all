@@ -168,7 +168,7 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
             </Space>
 
             {/* API Mode Switch */}
-            <ApiModeSwitch size="small" />
+            <ApiModeSwitch compact={true} />
 
             {/* User Info */}
             <Space>
