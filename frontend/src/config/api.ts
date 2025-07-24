@@ -10,7 +10,7 @@ export interface ApiConfig {
 // Default API configuration
 const defaultConfig: ApiConfig = {
   baseUrl: 'http://localhost:8000/api/v1',
-  mode: (import.meta.env?.VITE_APP_API_MODE as 'mock' | 'real' | 'hybrid') || 'hybrid',
+  mode: ((globalThis as any).import?.meta?.env?.VITE_APP_API_MODE as 'mock' | 'real' | 'hybrid') || 'hybrid',
   timeout: 10000,
   retryAttempts: 2
 };
@@ -91,7 +91,7 @@ export const apiConfig = new ApiConfigManager();
 apiConfig.loadFromStorage();
 
 // Enable debug tools in development
-if (import.meta.env?.DEV) {
+if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
   apiConfig.enableDebugMode();
 }
 
