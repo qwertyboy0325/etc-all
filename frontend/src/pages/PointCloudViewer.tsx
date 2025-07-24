@@ -5,24 +5,21 @@ import PointCloudViewer from '../components/PointCloudViewer'
 import { 
   PointCloudData, 
   PointCloudFileInfo, 
-  generateSamplePointCloud, 
-  loadPointCloudFromAPI, 
-  getProjectFiles,
-  uploadPointCloudFile 
+  generateSamplePointCloud
 } from '../utils/pointCloudLoader'
 
 const { Title, Text } = Typography
 const { Content } = Layout
 const { Option } = Select
 
-// Mock auth token and project ID for demo
-const MOCK_AUTH_TOKEN = 'demo-token'
-const MOCK_PROJECT_ID = 'demo-project'
+// Mock auth token and project ID for demo (unused in current demo mode)
+// const MOCK_AUTH_TOKEN = 'demo-token'
+// const MOCK_PROJECT_ID = 'demo-project'
 
 const PointCloudViewerPage: React.FC = () => {
   const [pointCloudData, setPointCloudData] = useState<PointCloudData | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | undefined>(undefined)
   const [files, setFiles] = useState<PointCloudFileInfo[]>([])
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -62,7 +59,7 @@ const PointCloudViewerPage: React.FC = () => {
 
   const loadSampleData = () => {
     setLoading(true)
-    setError(null)
+    setError(undefined)
     
     try {
       // Generate sample point cloud for demo
@@ -81,7 +78,7 @@ const PointCloudViewerPage: React.FC = () => {
     if (!fileId) return
     
     setLoading(true)
-    setError(null)
+    setError(undefined)
     
     try {
       // For demo, generate sample data instead of loading from API
@@ -156,7 +153,7 @@ const PointCloudViewerPage: React.FC = () => {
   const clearData = () => {
     setPointCloudData(null)
     setSelectedFileId(null)
-    setError(null)
+    setError(undefined)
   }
 
   return (
