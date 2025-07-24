@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ApiModeSwitch from '../components/ApiModeSwitch';
+import Navbar from '../components/Navbar';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -40,7 +41,8 @@ const Landing: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f0f2f5' }}>
-      <Content style={{ padding: '50px' }}>
+      <Navbar />
+      <Content style={{ padding: '50px', paddingTop: '114px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* Header */}
           <div style={{ textAlign: 'center', marginBottom: '50px' }}>

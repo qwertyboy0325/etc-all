@@ -25,9 +25,10 @@ import {
 import { useParams, useNavigate } from 'react-router-dom';
 import AnnotationTools from '../components/AnnotationTools';
 import AnnotationViewer from '../components/AnnotationViewer';
+import Navbar from '../components/Navbar';
 
 const { Title, Text } = Typography;
-const { Header, Content } = Layout;
+const { Content } = Layout;
 
 // Types
 interface Task {
@@ -256,46 +257,48 @@ const AnnotationPage: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {/* Header */}
-      <Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0' }}>
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Space>
-              <Button 
-                icon={<ArrowLeftOutlined />} 
-                onClick={() => navigate(-1)}
-              >
-                返回
-              </Button>
-              
-              <Divider type="vertical" />
-              
-              <Breadcrumb>
-                <Breadcrumb.Item>專案管理</Breadcrumb.Item>
-                <Breadcrumb.Item>任務列表</Breadcrumb.Item>
-                <Breadcrumb.Item>標注任務</Breadcrumb.Item>
-              </Breadcrumb>
-            </Space>
-          </Col>
-          
-          <Col>
-            <Space>
-              {statusInfo && (
-                <Tag color={statusInfo.color} icon={<ClockCircleOutlined />}>
-                  {statusInfo.text}
-                </Tag>
-              )}
-              
-              <Tag color="blue" icon={<FileTextOutlined />}>
-                {task.pointCloudFile}
-              </Tag>
-            </Space>
-          </Col>
-        </Row>
-      </Header>
-
+      <Navbar />
+      
       {/* Content */}
-      <Content style={{ padding: '24px' }}>
+      <Content style={{ padding: '24px', paddingTop: '88px' }}>
+        {/* Navigation */}
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Row justify="space-between" align="middle">
+            <Col>
+              <Space>
+                <Button 
+                  icon={<ArrowLeftOutlined />} 
+                  onClick={() => navigate(-1)}
+                >
+                  返回
+                </Button>
+                
+                <Divider type="vertical" />
+                
+                <Breadcrumb>
+                  <Breadcrumb.Item>專案管理</Breadcrumb.Item>
+                  <Breadcrumb.Item>任務列表</Breadcrumb.Item>
+                  <Breadcrumb.Item>標注任務</Breadcrumb.Item>
+                </Breadcrumb>
+              </Space>
+            </Col>
+            
+            <Col>
+              <Space>
+                {statusInfo && (
+                  <Tag color={statusInfo.color} icon={<ClockCircleOutlined />}>
+                    {statusInfo.text}
+                  </Tag>
+                )}
+                
+                <Tag color="blue" icon={<FileTextOutlined />}>
+                  {task.pointCloudFile}
+                </Tag>
+              </Space>
+            </Col>
+          </Row>
+        </Card>
+
         {/* Task Info */}
         <Card size="small" style={{ marginBottom: 16 }}>
           <Row gutter={24} align="middle">
@@ -332,7 +335,7 @@ const AnnotationPage: React.FC = () => {
         </Card>
 
         {/* Main Content */}
-        <div style={{ height: 'calc(100vh - 200px)', display: 'flex', gap: 16 }}>
+        <div style={{ height: 'calc(100vh - 320px)', display: 'flex', gap: 16 }}>
           {/* 3D Viewer */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <Card 
@@ -348,14 +351,14 @@ const AnnotationPage: React.FC = () => {
               style={{ height: '100%' }}
               bodyStyle={{ height: 'calc(100% - 57px)', padding: 0 }}
             >
-                             <AnnotationViewer
-                 pointCloudData={pointCloudData}
-                 annotations={annotations}
-                 isSelectionMode={true}
-                 selectedPoints={selectedPoints}
-                 onPointsSelect={handlePointsSelect}
-                 showStats={true}
-               />
+              <AnnotationViewer
+                pointCloudData={pointCloudData}
+                annotations={annotations}
+                isSelectionMode={true}
+                selectedPoints={selectedPoints}
+                onPointsSelect={handlePointsSelect}
+                showStats={true}
+              />
             </Card>
           </div>
           

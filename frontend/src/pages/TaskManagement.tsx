@@ -433,7 +433,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <Navbar />
       
-      <Content style={{ padding: '24px' }}>
+      <Content style={{ padding: '24px', paddingTop: '88px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {/* Header */}
           <Row justify="space-between" align="middle" style={{ marginBottom: '24px' }}>

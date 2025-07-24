@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Layout, Typography, Card, Button, Select, Space, message, Upload, Progress } from 'antd'
 import { Upload as UploadIcon, Eye, FileText, RefreshCcw } from 'lucide-react'
 import PointCloudViewer from '../components/PointCloudViewer'
+import Navbar from '../components/Navbar'
 import { 
   PointCloudData, 
   PointCloudFileInfo, 
@@ -158,7 +159,8 @@ const PointCloudViewerPage: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      <Content style={{ padding: '24px' }}>
+      <Navbar />
+      <Content style={{ padding: '24px', paddingTop: '88px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {/* Header */}
           <div style={{ marginBottom: '24px' }}>
