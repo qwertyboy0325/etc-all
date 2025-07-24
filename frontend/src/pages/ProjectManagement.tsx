@@ -133,7 +133,7 @@ const ProjectManagement: React.FC = () => {
         () => getMockProjects()
       );
 
-      setProjects(Array.isArray(data) ? data : data.items || []);
+      setProjects(Array.isArray(data) ? data : (data as any)?.items || []);
     } catch (error) {
       console.error('Load projects error:', error);
       message.error('載入專案失敗');
@@ -361,16 +361,15 @@ const ProjectManagement: React.FC = () => {
               <Text type="secondary">管理和監控所有點雲標注專案</Text>
             </Col>
             <Col>
-              {canCreateProjects && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => openModal()}
-                  size="large"
-                >
-                  創建專案
-                </Button>
-              )}
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => openModal()}
+                size="large"
+              >
+                創建專案
+              </Button>
+              {/* Debug: canCreateProjects = {String(canCreateProjects)}, user role = {user?.globalRole} */}
             </Col>
           </Row>
 
