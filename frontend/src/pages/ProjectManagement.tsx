@@ -146,7 +146,7 @@ const ProjectManagement: React.FC = () => {
   const handleSubmit = async (values: ProjectFormData) => {
     try {
       if (editingProject) {
-        // Update project
+        // Update project - 目前只在前端更新，後續需要實現後端API
         const updatedProject = {
           ...editingProject,
           ...values,
@@ -155,18 +155,56 @@ const ProjectManagement: React.FC = () => {
         setProjects(prev => prev.map(p => p.id === editingProject.id ? updatedProject : p));
         message.success('專案更新成功');
       } else {
-        // Create new project
-        const newProject: Project = {
-          id: Date.now().toString(),
-          ...values,
-          createdBy: user?.id || '1',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          memberCount: 1,
-          taskCount: 0,
-          completedTasks: 0,
-          progress: 0
+        // Create new project - 調用後端API
+        const projectData = {
+          name: values.name,
+          description: values.description,
+          is_public: false,
+          max_annotations_per_task: 3,
+          auto_assign_tasks: true,
+          require_review: true
         };
+
+        const createdProject = await smartApiCall(
+          '/projects',
+          {
+            method: 'POST',
+            body: JSON.stringify(projectData)
+          },
+          () => {
+            // Mock fallback - 只有在API調用失敗時才使用
+            const mockProject: Project = {
+              id: Date.now().toString(),
+              ...values,
+              createdBy: user?.id || '1',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              memberCount: 1,
+              taskCount: 0,
+              completedTasks: 0,
+              progress: 0
+            };
+            return mockProject;
+          }
+        );
+
+        // 處理API響應格式差異
+        const newProject: Project = {
+          id: (createdProject as any).id || Date.now().toString(),
+          name: (createdProject as any).name,
+          description: (createdProject as any).description || '',
+          status: (createdProject as any).status || 'active',
+          createdBy: (createdProject as any).created_by || user?.id || '1',
+          createdAt: (createdProject as any).created_at || new Date().toISOString(),
+          updatedAt: (createdProject as any).updated_at || new Date().toISOString(),
+          memberCount: 1,
+          taskCount: (createdProject as any).total_tasks || 0,
+          completedTasks: (createdProject as any).completed_tasks || 0,
+          progress: (createdProject as any).total_tasks > 0 
+            ? Math.round(((createdProject as any).completed_tasks / (createdProject as any).total_tasks) * 100) 
+            : 0
+        };
+
         setProjects(prev => [newProject, ...prev]);
         message.success('專案創建成功');
       }
