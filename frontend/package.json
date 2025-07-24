@@ -4,10 +4,13 @@
   "description": "ETC Point Cloud Annotation System Frontend",
   "private": true,
   "type": "module",
+  "homepage": "https://ezra4.github.io/ETC",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:gh": "vite build --base=/ETC/",
     "preview": "vite preview",
+    "deploy": "npm run build:gh && gh-pages -d dist",
     "lint": "eslint . --ext js,jsx,ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix",
     "type-check": "tsc --noEmit",
@@ -15,35 +18,37 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.1",
-    "three": "^0.158.0",
-    "@react-three/fiber": "^8.15.11",
     "@react-three/drei": "^9.88.13",
+    "@react-three/fiber": "^8.15.11",
     "antd": "^5.12.8",
     "axios": "^1.6.2",
-    "zustand": "^4.4.7",
-    "react-query": "^3.39.3",
     "dayjs": "^1.11.10",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
+    "react-query": "^3.39.3",
+    "react-router-dom": "^6.20.1",
     "recharts": "^2.8.0",
-    "lucide-react": "^0.294.0"
+    "three": "^0.158.0",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@types/node": "^24.1.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@types/three": "^0.158.3",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.0.4",
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "gh-pages": "^6.3.0",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
-    "vitest": "^1.0.4",
-    "@vitest/coverage-v8": "^1.0.4"
+    "vitest": "^1.0.4"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -60,4 +65,4 @@
       "last 1 safari version"
     ]
   }
-} 
+}

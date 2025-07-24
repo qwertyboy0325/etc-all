@@ -7,37 +7,31 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [react()],
   
-  // Development server configuration
-  server: {
-    host: true, // Listen on all addresses
-    port: 3000,
-    strictPort: true,
-    hmr: {
-      port: 3000,
-    },
-    proxy: {
-      // Proxy API requests to backend
-      '/api': {
-        target: 'http://api:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
+  // GitHub Pages configuration
+  base: process.env.NODE_ENV === 'production' ? '/ETC/' : '/',
   
   // Build configuration
   build: {
     outDir: 'dist',
+    assetsDir: 'assets',
     sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
-          antd: ['antd'],
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['antd'],
           three: ['three', '@react-three/fiber', '@react-three/drei'],
         },
       },
     },
+    chunkSizeWarningLimit: 1600,
+  },
+  
+  // Development server
+  server: {
+    port: 3000,
+    host: true,
+    strictPort: false,
   },
   
   // Path resolution
@@ -47,31 +41,34 @@ export default defineConfig({
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
       '@utils': fileURLToPath(new URL('./src/utils', import.meta.url)),
-      '@hooks': fileURLToPath(new URL('./src/hooks', import.meta.url)),
-      '@store': fileURLToPath(new URL('./src/store', import.meta.url)),
       '@types': fileURLToPath(new URL('./src/types', import.meta.url)),
-      '@assets': fileURLToPath(new URL('./src/assets', import.meta.url)),
     },
-  },
-  
-  // Environment variables
-  define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
   },
   
   // CSS configuration
   css: {
-    devSourcemap: true,
+    preprocessorOptions: {
+      less: {
+        javascriptEnabled: true,
+      },
+    },
   },
   
-  // Preview server configuration
-  preview: {
-    port: 3000,
-    host: true,
+  // Define global constants
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
   },
   
-  // Optimize dependencies
+  // Optimizations
   optimizeDeps: {
-    include: ['react', 'react-dom', 'antd', 'three'],
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'antd',
+      'three',
+      '@react-three/fiber',
+      '@react-three/drei',
+    ],
   },
 }) 
