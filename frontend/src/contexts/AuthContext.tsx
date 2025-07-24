@@ -62,6 +62,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Helper function to create mock JWT tokens
+  const createMockJWT = (userId: string, email: string, role: string): string => {
+    // Create a mock JWT with proper structure: header.payload.signature
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({
+      sub: userId,
+      email: email,
+      role: role,
+      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+      iat: Math.floor(Date.now() / 1000)
+    }));
+    const signature = btoa('mock-signature-' + Date.now());
+    
+    return `${header}.${payload}.${signature}`;
+  };
+
   // Login function
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -107,20 +123,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 isActive: true,
                 createdAt: new Date().toISOString()
               },
-              accessToken: 'mock-token-123'
+              accessToken: createMockJWT('1', email, 'admin')
             });
           } else if (email.includes('@') && password.length >= 6) {
             // Accept any valid email for demo
+            const userId = Date.now().toString();
             resolve({
               user: {
-                id: Date.now().toString(),
+                id: userId,
                 email: email,
                 fullName: email.split('@')[0],
                 globalRole: 'user',
                 isActive: true,
                 createdAt: new Date().toISOString()
               },
-              accessToken: 'mock-token-' + Date.now()
+              accessToken: createMockJWT(userId, email, 'user')
             });
           } else {
             reject(new Error('帳號或密碼錯誤'));
@@ -159,7 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 isActive: true,
                 createdAt: new Date().toISOString()
               },
-              accessToken: 'mock-token-' + Date.now()
+              accessToken: createMockJWT(Date.now().toString(), email, 'user')
             });
           } else {
             reject(new Error('註冊信息無效'));
