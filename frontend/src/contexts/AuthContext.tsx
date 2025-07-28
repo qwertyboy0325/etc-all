@@ -113,17 +113,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Fallback to mock API call
       const response = await new Promise<any>((resolve, reject) => {
         setTimeout(() => {
-          if (email === 'admin@etc.com' && password === 'admin') {
+          if (email === 'admin@etc.com' && password === 'admin123') {
             resolve({
               user: {
                 id: '1',
                 email: email,
                 fullName: 'Admin User',
-                globalRole: 'admin',
+                globalRole: 'system_admin',
                 isActive: true,
                 createdAt: new Date().toISOString()
               },
-              accessToken: createMockJWT('1', email, 'admin')
+              accessToken: createMockJWT('1', email, 'system_admin')
             });
           } else if (email.includes('@') && password.length >= 6) {
             // Accept any valid email for demo

@@ -33,28 +33,24 @@ const PointCloudViewerPage: React.FC = () => {
 
   const loadFilesList = async () => {
     try {
-      // For demo purposes, use mock data
-      setFiles([
-        {
-          id: 'sample-1',
-          original_filename: 'sample_pointcloud.npy',
-          file_size: 240000,
-          status: 'UPLOADED',
-          point_count: 10000,
-          dimensions: 3,
-          min_x: '-50.0',
-          max_x: '50.0',
-          min_y: '-50.0',
-          max_y: '50.0',
-          min_z: '-50.0',
-          max_z: '50.0',
-          upload_completed_at: new Date().toISOString(),
-          created_at: new Date().toISOString()
+      const response = await fetch('http://localhost:8000/api/v1/files', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
         }
-      ])
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setFiles(data.items || data || []);
+      } else {
+        console.error('Failed to load files');
+        setFiles([]);
+      }
     } catch (err) {
       console.error('Failed to load files:', err)
       message.error('載入文件列表失敗')
+      setFiles([]);
     }
   }
 
@@ -82,11 +78,32 @@ const PointCloudViewerPage: React.FC = () => {
     setError(undefined)
     
     try {
-      // For demo, generate sample data instead of loading from API
-      const sampleData = generateSamplePointCloud(12000)
-      setPointCloudData(sampleData)
-      setSelectedFileId(fileId)
-      message.success('點雲文件載入成功！')
+      const response = await fetch(`http://localhost:8000/api/v1/files/${fileId}/download`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const pointCloudData = new Float32Array(arrayBuffer);
+        
+        // Convert to PointCloudData format
+        const data: PointCloudData = {
+          positions: pointCloudData,
+          pointCount: pointCloudData.length / 3,
+          bounds: {
+            min: [-50, -50, -50],
+            max: [50, 50, 50]
+          }
+        };
+        
+        setPointCloudData(data);
+        setSelectedFileId(fileId);
+        message.success('點雲文件載入成功！');
+      } else {
+        throw new Error('Failed to load file');
+      }
     } catch (err) {
       setError('載入文件失敗')
       message.error('載入文件失敗')
@@ -100,55 +117,32 @@ const PointCloudViewerPage: React.FC = () => {
     setUploadProgress(0)
     
     try {
-      // For demo, simulate upload progress
-      const interval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(interval)
-            return 95
-          }
-          return prev + Math.random() * 10
-        })
-      }, 200)
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const response = await fetch('http://localhost:8000/api/v1/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      })
 
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      setUploadProgress(100)
-      clearInterval(interval)
-      
-      // Add mock file to list
-      const newFile: PointCloudFileInfo = {
-        id: `file-${Date.now()}`,
-        original_filename: file.name,
-        file_size: file.size,
-        status: 'UPLOADED',
-        point_count: 8000 + Math.floor(Math.random() * 10000),
-        dimensions: 3,
-        min_x: '-45.0',
-        max_x: '45.0',
-        min_y: '-45.0',
-        max_y: '45.0',
-        min_z: '-45.0',
-        max_z: '45.0',
-        upload_completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
+      if (response.ok) {
+        const uploadedFile = await response.json()
+        setFiles(prev => [...prev, uploadedFile])
+        message.success('文件上傳成功！')
+        setUploadProgress(100)
+      } else {
+        throw new Error('Upload failed')
       }
-      
-      setFiles(prev => [...prev, newFile])
-      message.success('文件上傳成功！')
-      
-      // Auto-load the uploaded file
-      await loadFileData(newFile.id)
-      
     } catch (err) {
+      console.error('Upload error:', err)
       message.error('文件上傳失敗')
     } finally {
       setIsUploading(false)
       setUploadProgress(0)
     }
-    
-    return false // Prevent default upload
   }
 
   const clearData = () => {
