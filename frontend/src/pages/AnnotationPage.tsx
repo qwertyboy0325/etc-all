@@ -26,6 +26,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AnnotationTools from '../components/AnnotationTools';
 import AnnotationViewer from '../components/AnnotationViewer';
 import Navbar from '../components/Navbar';
+import { apiCall } from '../utils/api';
+import { parseNpyFile } from '../utils/npyParser';
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
@@ -36,7 +38,8 @@ interface Task {
   name: string;
   description: string;
   status: string;
-  pointCloudFile: string;
+  pointCloudFile?: string;
+  pointcloud_file_id?: string;
   progress: number;
 }
 
@@ -70,13 +73,13 @@ const AnnotationPage: React.FC = () => {
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
   const [annotations] = useState<any[]>([]);
 
-  // Mock data
+  // TODO: 改為從後端載入車種
   const mockVehicleTypes: VehicleType[] = [
-    { id: '1', name: '小客車', code: 'CAR', description: '一般乘用車' },
-    { id: '2', name: '貨車', code: 'TRUCK', description: '商用貨車' },
-    { id: '3', name: '機車', code: 'MOTORCYCLE', description: '機車、摩托車' },
-    { id: '4', name: '巴士', code: 'BUS', description: '公共巴士' },
-    { id: '5', name: '休旅車', code: 'SUV', description: '運動型多用途車' },
+    { id: 'car', name: '小客車', code: 'CAR', description: '一般乘用車' },
+    { id: 'truck', name: '貨車', code: 'TRUCK', description: '商用貨車' },
+    { id: 'motorcycle', name: '機車', code: 'MOTORCYCLE', description: '機車、摩托車' },
+    { id: 'bus', name: '巴士', code: 'BUS', description: '公共巴士' },
+    { id: 'suv', name: '休旅車', code: 'SUV', description: '運動型多用途車' },
   ];
 
   // Initialize data
@@ -85,42 +88,33 @@ const AnnotationPage: React.FC = () => {
   }, [taskId]);
 
   const loadData = async () => {
+    if (!projectId || !taskId) return;
     setLoading(true);
     try {
-      // Simulate API calls
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 1) 任務詳情
+      const taskResp = await apiCall(`/projects/${projectId}/tasks/${taskId}`);
+      setTask({
+        id: taskResp.id,
+        name: taskResp.name,
+        description: taskResp.description,
+        status: taskResp.status,
+        pointCloudFile: taskResp.pointcloud_file?.original_filename,
+        pointcloud_file_id: taskResp.pointcloud_file_id,
+        progress: 0,
+      });
 
-      // Mock task data
-      const mockTask: Task = {
-        id: taskId || '1',
-        name: `點雲標注任務 ${taskId}`,
-        description: '對指定區域的車輛進行類型標注',
-        status: 'assigned',
-        pointCloudFile: `pointcloud_${taskId}.npy`,
-        progress: 30
-      };
+      // 2) 檔案下載 URL -> 下載 NPY -> 解析
+      if (!taskResp.pointcloud_file_id) throw new Error('任務缺少點雲文件');
+      const dl = await apiCall(`/projects/${projectId}/files/${taskResp.pointcloud_file_id}/download`);
+      const url: string = dl.download_url || dl.url || dl.downloadUrl;
+      if (!url) throw new Error('無法取得下載連結');
+      const binResp = await fetch(url);
+      if (!binResp.ok) throw new Error(`下載失敗 HTTP ${binResp.status}`);
+      const arrayBuf = await binResp.arrayBuffer();
+      const parsed = parseNpyFile(arrayBuf);
+      setPointCloudData(parsed.data);
 
-      // Mock point cloud data (30k points)
-      const mockData = new Float32Array(
-        Array.from({length: 30000}, () => Math.random() * 10 - 5)
-      );
-
-      setTask(mockTask);
-      setPointCloudData(mockData);
       setVehicleTypes(mockVehicleTypes);
-
-      // Check for existing annotation
-      const existingAnnotation = localStorage.getItem(`annotation_${taskId}`);
-      if (existingAnnotation) {
-        const annotation = JSON.parse(existingAnnotation);
-        setCurrentAnnotation(annotation);
-        if (annotation.annotationData?.selected_points) {
-          setSelectedPoints({
-            indices: annotation.annotationData.selected_points,
-            coordinates: annotation.annotationData.point_coordinates || []
-          });
-        }
-      }
 
       message.success('標注環境載入完成');
     } catch (error) {
@@ -139,23 +133,29 @@ const AnnotationPage: React.FC = () => {
 
   // Handle save annotation
   const handleSaveAnnotation = async (annotationData: any) => {
+    if (!projectId || !taskId) return;
     try {
       setLoading(true);
-      
-      const annotation: Annotation = {
-        id: currentAnnotation?.id || Date.now().toString(),
-        taskId: taskId!,
-        vehicleTypeId: annotationData.vehicleTypeId,
+      const payload = {
+        task_id: taskId,
+        vehicle_type_id: annotationData.vehicleTypeId,
         confidence: annotationData.confidence,
         notes: annotationData.notes,
-        status: 'draft',
-        annotationData: annotationData.annotation_data
+        annotation_data: annotationData.annotation_data,
       };
-
-      // Save to localStorage (simulate API)
-      localStorage.setItem(`annotation_${taskId}`, JSON.stringify(annotation));
-      setCurrentAnnotation(annotation);
-
+      const res = await apiCall(`/projects/${projectId}/annotations`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setCurrentAnnotation({
+        id: res.id,
+        taskId: res.task_id || taskId,
+        vehicleTypeId: res.vehicle_type_id || annotationData.vehicleTypeId,
+        confidence: res.confidence ?? annotationData.confidence,
+        notes: res.notes ?? annotationData.notes,
+        status: res.status || 'draft',
+        annotationData: res.annotation_data || annotationData.annotation_data,
+      });
       message.success('標注已保存為草稿');
     } catch (error) {
       console.error('Error saving annotation:', error);
@@ -167,29 +167,42 @@ const AnnotationPage: React.FC = () => {
 
   // Handle submit annotation
   const handleSubmitAnnotation = async (annotationData: any) => {
+    if (!projectId || !taskId) return;
     try {
       setLoading(true);
+      let annotationId = currentAnnotation?.id;
+      if (!annotationId) {
+        // 先建立
+        const createRes = await apiCall(`/projects/${projectId}/annotations`, {
+          method: 'POST',
+          body: JSON.stringify({
+            task_id: taskId,
+            vehicle_type_id: annotationData.vehicleTypeId,
+            confidence: annotationData.confidence,
+            notes: annotationData.notes,
+            annotation_data: annotationData.annotation_data,
+          }),
+        });
+        annotationId = createRes.id;
+        setCurrentAnnotation({
+          id: createRes.id,
+          taskId,
+          vehicleTypeId: createRes.vehicle_type_id || annotationData.vehicleTypeId,
+          confidence: createRes.confidence ?? annotationData.confidence,
+          notes: createRes.notes ?? annotationData.notes,
+          status: createRes.status || 'draft',
+          annotationData: createRes.annotation_data || annotationData.annotation_data,
+        });
+      }
 
-      const annotation: Annotation = {
-        id: currentAnnotation?.id || Date.now().toString(),
-        taskId: taskId!,
-        vehicleTypeId: annotationData.vehicleTypeId,
-        confidence: annotationData.confidence,
-        notes: annotationData.notes,
-        status: 'submitted',
-        annotationData: annotationData.annotation_data
-      };
-
-      // Save to localStorage (simulate API)
-      localStorage.setItem(`annotation_${taskId}`, JSON.stringify(annotation));
-      setCurrentAnnotation(annotation);
-
+      // 提交審核
+      const submitRes = await apiCall(`/projects/${projectId}/annotations/${annotationId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      setCurrentAnnotation(prev => prev ? { ...prev, status: submitRes.status || 'submitted' } : prev);
       message.success('標注已提交審核');
-      
-      // Redirect after successful submission
-      setTimeout(() => {
-        navigate(`/projects/${projectId}/tasks`);
-      }, 2000);
+      setTimeout(() => navigate(`/projects/${projectId}/tasks`), 1200);
     } catch (error) {
       console.error('Error submitting annotation:', error);
       message.error('提交標注失敗');
@@ -199,11 +212,23 @@ const AnnotationPage: React.FC = () => {
   };
 
   // Handle delete annotation
-  const handleDeleteAnnotation = () => {
-    localStorage.removeItem(`annotation_${taskId}`);
-    setCurrentAnnotation(null);
-    setSelectedPoints({ indices: [], coordinates: [] });
-    message.success('標注已刪除');
+  const handleDeleteAnnotation = async () => {
+    if (!projectId || !currentAnnotation?.id) {
+      message.warning('無草稿可刪除');
+      return;
+    }
+    try {
+      setLoading(true);
+      await apiCall(`/projects/${projectId}/annotations/${currentAnnotation.id}`, { method: 'DELETE' });
+      setCurrentAnnotation(null);
+      setSelectedPoints({ indices: [], coordinates: [] });
+      message.success('標注已刪除');
+    } catch (error) {
+      console.error('Error deleting annotation:', error);
+      message.error('刪除標注失敗');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get status info
@@ -291,9 +316,11 @@ const AnnotationPage: React.FC = () => {
                   </Tag>
                 )}
                 
-                <Tag color="blue" icon={<FileTextOutlined />}>
-                  {task.pointCloudFile}
-                </Tag>
+                  {task.pointCloudFile && (
+                    <Tag color="blue" icon={<FileTextOutlined />}>
+                      {task.pointCloudFile}
+                    </Tag>
+                  )}
               </Space>
             </Col>
           </Row>

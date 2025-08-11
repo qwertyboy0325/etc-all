@@ -33,3 +33,19 @@
 ## 風險與緩解
 - 點雲選取效能：先以抽樣/批次選擇，必要時限制每次選取點數
 - 數據量大：後端限制 payload 大小並壓縮/分頁查詢
+
+## 本週進度（滾動更新）
+- 已完成：
+  - 前端 `AnnotationPage` 與後端 API 串接，移除本地 mock：
+    - 讀取任務詳情 `/projects/{pid}/tasks/{tid}` 取得 `pointcloud_file_id`
+    - 透過 `/projects/{pid}/files/{file_id}/download` 取得簽名 URL，下載 .npy 並以 `npyParser` 解析為 Float32Array
+    - 保存草稿：`POST /projects/{pid}/annotations`，帶入 `task_id`、`vehicle_type_id`、`confidence`、`notes`、`annotation_data.selected_points`
+    - 提交審核：若無草稿先建立，之後 `POST /projects/{pid}/annotations/{aid}/submit`
+    - 刪除草稿：`DELETE /projects/{pid}/annotations/{aid}`
+  - `AnnotationTools` 保持 UI/資料結構一致，無破壞性變更
+- 進行中：
+  - 後端車種列表 API 對接（暫以前端靜態表列替代）
+  - 依專案內角色控制標注按鈕顯示（PROJECT_ADMIN/REVIEWER/ANNOTATOR）
+- 待辦：
+  - 載入既有標注清單與在 3D 視圖預覽
+  - 失敗情境與錯誤訊息標準化顯示
