@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Modal,
   Form,
@@ -8,8 +8,6 @@ import {
   InputNumber,
   Button,
   Space,
-  Upload,
-  message,
   Row,
   Col,
   Divider,
@@ -18,10 +16,9 @@ import {
 import {
   PlusOutlined,
   UploadOutlined,
-  FileTextOutlined,
-  UserOutlined
+  FileTextOutlined
 } from '@ant-design/icons';
-import type { UploadFile } from 'antd/es/upload/interface';
+import type { FileInfo } from '../services/fileService';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -34,91 +31,55 @@ interface TaskCreateModalProps {
   onSubmit: (taskData: TaskFormData) => void;
   loading?: boolean;
   projectId: string;
+  availableFiles: FileInfo[];
 }
 
 export interface TaskFormData {
   name: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  assignedTo?: string;
   dueDate?: string;
-  estimatedHours?: number;
-  pointCloudFiles: UploadFile[];
-  tags: string[];
+  maxAnnotations?: number;
+  requireReview?: boolean;
+  pointcloudFileId: string;
+  instructions?: string;
 }
-
-// Mock users for assignment
-const mockUsers = [
-  { id: '1', name: 'Admin User', email: 'admin@etc.com' },
-  { id: '2', name: '張小明', email: 'zhang@etc.com' },
-  { id: '3', name: '李小華', email: 'li@etc.com' },
-  { id: '4', name: '王小紅', email: 'wang@etc.com' },
-  { id: '5', name: '陳小美', email: 'chen@etc.com' }
-];
 
 const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   visible,
   onCancel,
   onSubmit,
-  loading = false
+  loading = false,
+  availableFiles
 }) => {
   const [form] = Form.useForm();
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
 
   // Reset form when modal closes
   useEffect(() => {
     if (!visible) {
       form.resetFields();
-      setFileList([]);
     }
   }, [visible, form]);
 
   // Handle form submission
   const handleSubmit = async (values: any) => {
     try {
+      const due = values.dueDate;
       const taskData: TaskFormData = {
-        ...values,
-        pointCloudFiles: fileList,
-        tags: values.tags || []
+        name: values.name,
+        description: values.description,
+        priority: values.priority,
+        pointcloudFileId: values.pointcloudFileId,
+        maxAnnotations: values.maxAnnotations ?? 3,
+        requireReview: values.requireReview ?? true,
+        instructions: values.instructions,
+        dueDate: due && typeof due.toDate === 'function' ? due.toDate().toISOString() : undefined
       };
 
       await onSubmit(taskData);
     } catch (error) {
       console.error('Task creation error:', error);
     }
-  };
-
-  // Handle file upload
-  const handleUpload = {
-    beforeUpload: (file: UploadFile) => {
-      // Check file type
-      const isValidType = file.name?.toLowerCase().endsWith('.npy') || 
-                         file.name?.toLowerCase().endsWith('.npz') ||
-                         file.name?.toLowerCase().endsWith('.ply') ||
-                         file.name?.toLowerCase().endsWith('.pcd');
-      
-      if (!isValidType) {
-        message.error('只支持 .npy, .npz, .ply, .pcd 格式的文件');
-        return false;
-      }
-
-      // Check file size (100MB limit)
-      const isLt100M = file.size ? file.size / 1024 / 1024 < 100 : true;
-      if (!isLt100M) {
-        message.error('文件大小不能超過100MB');
-        return false;
-      }
-
-      // Add to file list
-      setFileList(prev => [...prev, file]);
-      message.success(`${file.name} 文件添加成功`);
-      
-      return false; // Prevent automatic upload
-    },
-    onRemove: (file: UploadFile) => {
-      setFileList(prev => prev.filter(f => f.uid !== file.uid));
-    },
-    fileList: fileList
   };
 
   return (
@@ -142,7 +103,8 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         requiredMark={false}
         initialValues={{
           priority: 'medium',
-          estimatedHours: 8
+          maxAnnotations: 3,
+          requireReview: true
         }}
       >
         {/* Basic Information */}
@@ -198,12 +160,12 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
           />
         </Form.Item>
 
-        {/* Assignment and Schedule */}
+        {/* File and Schedule */}
         <Row gutter={16}>
           <Col span={24}>
             <Text strong style={{ fontSize: '16px' }}>
-              <UserOutlined style={{ marginRight: '8px' }} />
-              分配與計劃
+              <UploadOutlined style={{ marginRight: '8px' }} />
+              文件與計劃
             </Text>
             <Divider style={{ margin: '12px 0' }} />
           </Col>
@@ -212,16 +174,16 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              label="指派給"
-              name="assignedTo"
+              label="點雲文件"
+              name="pointcloudFileId"
+              rules={[{ required: true, message: '請選擇點雲文件' }]}
             >
-              <Select placeholder="選擇標注員（可以稍後分配）" allowClear>
-                {mockUsers.map(user => (
-                  <Option key={user.id} value={user.id}>
+              <Select placeholder="選擇已上傳的點雲文件">
+                {availableFiles.map(f => (
+                  <Option key={f.id} value={f.id}>
                     <Space>
-                      <UserOutlined />
-                      {user.name}
-                      <Text type="secondary">({user.email})</Text>
+                      {f.original_filename}
+                      <Text type="secondary">({Math.round(f.file_size / 1024)} KB)</Text>
                     </Space>
                   </Option>
                 ))}
@@ -241,63 +203,24 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
           </Col>
           <Col span={6}>
             <Form.Item
-              label="預估工時（小時）"
-              name="estimatedHours"
+              label="單任務最大標注數"
+              name="maxAnnotations"
             >
               <InputNumber
                 min={1}
-                max={200}
+                max={10}
                 style={{ width: '100%' }}
-                placeholder="8"
+                placeholder="3"
               />
             </Form.Item>
           </Col>
         </Row>
 
-        {/* File Upload */}
-        <Row gutter={16}>
-          <Col span={24}>
-            <Text strong style={{ fontSize: '16px' }}>
-              <UploadOutlined style={{ marginRight: '8px' }} />
-              點雲文件
-            </Text>
-            <Divider style={{ margin: '12px 0' }} />
-          </Col>
-        </Row>
-
         <Form.Item
-          label="上傳點雲文件"
-          required
-          help="支持 .npy, .npz, .ply, .pcd 格式，單個文件最大100MB"
+          label="標注說明（選填）"
+          name="instructions"
         >
-          <Upload
-            {...handleUpload}
-            multiple
-            listType="text"
-            showUploadList={{
-              showPreviewIcon: true,
-              showDownloadIcon: false,
-              showRemoveIcon: true
-            }}
-          >
-            <Button icon={<UploadOutlined />}>
-              選擇文件
-            </Button>
-          </Upload>
-          
-          {fileList.length === 0 && (
-            <div style={{ 
-              marginTop: '8px', 
-              padding: '16px', 
-              border: '1px dashed #d9d9d9',
-              borderRadius: '6px',
-              textAlign: 'center',
-              color: '#999'
-            }}>
-              <UploadOutlined style={{ fontSize: '24px', marginBottom: '8px' }} />
-              <div>拖拽文件到此處或點擊上傳</div>
-            </div>
-          )}
+          <TextArea rows={3} placeholder="針對標注的特別指引..." />
         </Form.Item>
 
         {/* Tags */}
@@ -324,7 +247,7 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
               type="primary"
               htmlType="submit"
               loading={loading}
-              disabled={fileList.length === 0}
+              
             >
               創建任務
             </Button>

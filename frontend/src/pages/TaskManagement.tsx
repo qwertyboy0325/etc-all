@@ -20,7 +20,7 @@ import {
   FilterOutlined as Filter,
   ReloadOutlined
 } from '@ant-design/icons';
-import { useAuth } from '../contexts/AuthContext';
+// import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import TaskBoard from '../components/TaskBoard';
 import TaskCreateModal, { TaskFormData } from '../components/TaskCreateModal';
@@ -28,9 +28,10 @@ import TaskList from '../components/TaskList';
 import { apiCall } from '../utils/api';
 // import TaskStatsCard from '../components/TaskStatsCard';
 import { 
-  Task, TaskStatus, TaskPriority, TaskFilter, TaskStats,
+  Task, TaskStatus, TaskFilter, TaskStats,
   TASK_STATUS_LABELS, TASK_PRIORITY_LABELS 
 } from '../types/task';
+import { getFileList, type FileInfo } from '../services/fileService';
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -40,7 +41,7 @@ interface TaskManagementProps {}
 
 const TaskManagement: React.FC<TaskManagementProps> = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const { user } = useAuth();
+  // const { user } = useAuth();
   
   // State
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -55,6 +56,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     pageSize: 20,
     total: 0
   });
+  const [availableFiles, setAvailableFiles] = useState<FileInfo[]>([]);
 
   // Effects
   useEffect(() => {
@@ -63,6 +65,18 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
       loadStats();
     }
   }, [projectId, filters, pagination.current, searchTerm]);
+
+  useEffect(() => {
+    // Load available files for task creation
+    (async () => {
+      try {
+        const files = await getFileList();
+        setAvailableFiles(files);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
 
   // Removed mock data generation
 
@@ -120,36 +134,26 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     
     setLoading(true);
     try {
-      // Mock API call - create task
-      const newTask: Task = {
-        id: Date.now().toString(),
-        project_id: projectId,
+      const payload = {
         name: taskData.name,
         description: taskData.description,
-        status: TaskStatus.PENDING,
-        priority: TaskPriority.MEDIUM,
-        max_annotations: 1,
-        require_review: false,
+        priority: taskData.priority,
+        pointcloud_file_id: taskData.pointcloudFileId,
+        max_annotations: taskData.maxAnnotations ?? 3,
+        require_review: taskData.requireReview ?? true,
         due_date: taskData.dueDate,
-        assigned_to: taskData.assignedTo,
-        created_by: user?.id || '1',
-        pointcloud_file_id: Date.now().toString() + '_file',
-        is_completed: false,
-        annotation_count: 0,
-        completion_rate: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_overdue: false
+        instructions: taskData.instructions
       };
 
-      // Add to tasks list
-      setTasks(prev => [newTask, ...prev]);
-      
+      await apiCall(`/projects/${projectId}/tasks`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
       message.success('任務創建成功！');
       setIsCreateModalVisible(false);
-      
-      // Reload stats
-      loadStats();
+      await loadTasks();
+      await loadStats();
     } catch (error) {
       console.error('Create task error:', error);
       message.error('創建任務失敗');
@@ -167,23 +171,14 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     if (!projectId) return;
     
     try {
-      const response = await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/assign`, {
+      await apiCall(`/projects/${projectId}/tasks/${taskId}/assign`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ assignee_id: assigneeId })
       });
 
-      if (response.ok) {
         message.success('任務分配成功');
         loadTasks();
         loadStats();
-      } else {
-        const error = await response.json();
-        message.error(error.detail || '分配任務失敗');
-      }
     } catch (error) {
       console.error('Assign task error:', error);
       message.error('分配任務時發生錯誤');
@@ -194,23 +189,14 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     if (!projectId) return;
     
     try {
-      const response = await fetch(`/api/v1/projects/${projectId}/tasks/${taskId}/status`, {
+      await apiCall(`/projects/${projectId}/tasks/${taskId}/status`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ status })
       });
 
-      if (response.ok) {
         message.success('任務狀態更新成功');
         loadTasks();
         loadStats();
-      } else {
-        const error = await response.json();
-        message.error(error.detail || '更新任務狀態失敗');
-      }
     } catch (error) {
       console.error('Update status error:', error);
       message.error('更新任務狀態時發生錯誤');
@@ -415,6 +401,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
             onSubmit={handleCreateTask}
             loading={loading}
             projectId={projectId || ''}
+            availableFiles={availableFiles}
           />
         </div>
       </Content>
