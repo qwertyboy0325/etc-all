@@ -362,8 +362,8 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
                 </Button>
               </Col>
               <Col xs={24} sm={8} md={6}>
-                <div style={{ textAlign: 'right' }}>
-                  <Button.Group>
+                  <div style={{ textAlign: 'right' }}>
+                  <Space.Compact>
                     <Button 
                       type={viewMode === 'list' ? 'primary' : 'default'}
                       onClick={() => setViewMode('list')}
@@ -376,7 +376,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
                     >
                       看板
                     </Button>
-                  </Button.Group>
+                  </Space.Compact>
                 </div>
               </Col>
             </Row>

@@ -96,18 +96,7 @@ if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
 }
 
 // Helper functions
-export const isRealApiEnabled = () => {
-  const mode = apiConfig.getMode();
-  return mode === 'real' || mode === 'hybrid';
-};
-
-export const isMockOnlyMode = () => {
-  return apiConfig.getMode() === 'mock';
-};
-
-export const isHybridMode = () => {
-  return apiConfig.getMode() === 'hybrid';
-};
+// Mode helpers removed; always real API
 
 // API mode descriptions
 export const API_MODE_DESCRIPTIONS = {

@@ -133,7 +133,7 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
       onCancel={onCancel}
       footer={null}
       width={800}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { message } from 'antd';
+import { apiConfig } from '../config/api';
 
 // Types
 export interface User {
@@ -62,96 +63,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Helper function to create mock JWT tokens
-  const createMockJWT = (userId: string, email: string, role: string): string => {
-    // Create a mock JWT with proper structure: header.payload.signature
-    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-    const payload = btoa(JSON.stringify({
-      sub: userId,
-      email: email,
-      role: role,
-      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
-      iat: Math.floor(Date.now() / 1000)
-    }));
-    const signature = btoa('mock-signature-' + Date.now());
-    
-    return `${header}.${payload}.${signature}`;
-  };
+  // Removed mock token helper – always use real API
 
-  // Login function
+  // Login function (real API only)
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Try real API first, fallback to mock if API fails
-      try {
-        const response = await fetch('http://localhost:8000/api/v1/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email, password })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Store authentication data
-          localStorage.setItem('token', data.access_token || data.accessToken);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          
-          setToken(data.access_token || data.accessToken);
-          setUser(data.user);
-
-          return true;
-        } else {
-          // If API fails, try mock authentication
-          console.warn('Real API login failed, trying mock authentication');
-        }
-      } catch (apiError) {
-        console.warn('API login failed, using mock authentication:', apiError);
-      }
-
-      // Fallback to mock API call
-      const response = await new Promise<any>((resolve, reject) => {
-        setTimeout(() => {
-          if (email === 'admin@etc.com' && password === 'admin123') {
-            resolve({
-              user: {
-                id: '1',
-                email: email,
-                fullName: 'Admin User',
-                globalRole: 'system_admin',
-                isActive: true,
-                createdAt: new Date().toISOString()
-              },
-              accessToken: createMockJWT('1', email, 'system_admin')
-            });
-          } else if (email.includes('@') && password.length >= 6) {
-            // Accept any valid email for demo
-            const userId = Date.now().toString();
-            resolve({
-              user: {
-                id: userId,
-                email: email,
-                fullName: email.split('@')[0],
-                globalRole: 'user',
-                isActive: true,
-                createdAt: new Date().toISOString()
-              },
-              accessToken: createMockJWT(userId, email, 'user')
-            });
-          } else {
-            reject(new Error('帳號或密碼錯誤'));
-          }
-        }, 1000);
+      console.log('🔐 嘗試登入:', email);
+      const response = await fetch(`${apiConfig.getConfig().baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       });
 
-      // Store authentication data
-      localStorage.setItem('token', response.accessToken);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      
-      setToken(response.accessToken);
-      setUser(response.user);
+      console.log('📡 API響應狀態:', response.status);
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `API錯誤: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ 真實API登入成功:', data);
+
+      localStorage.setItem('token', data.access_token || data.accessToken);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setToken(data.access_token || data.accessToken);
+      setUser(data.user);
       return true;
     } catch (error: any) {
       console.error('Login error:', error);
@@ -160,37 +97,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Register function
+  // Register function (real API only)
   const register = async (email: string, password: string, fullName: string): Promise<boolean> => {
     try {
-      // Mock API call - replace with actual backend call
-      const response = await new Promise<any>((resolve, reject) => {
-        setTimeout(() => {
-          if (email.includes('@') && password.length >= 6 && fullName.length >= 2) {
-            resolve({
-              user: {
-                id: Date.now().toString(),
-                email: email,
-                fullName: fullName,
-                globalRole: 'user',
-                isActive: true,
-                createdAt: new Date().toISOString()
-              },
-              accessToken: createMockJWT(Date.now().toString(), email, 'user')
-            });
-          } else {
-            reject(new Error('註冊信息無效'));
-          }
-        }, 1000);
+      const response = await fetch(`${apiConfig.getConfig().baseUrl}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name: fullName })
       });
 
-      // Store authentication data
-      localStorage.setItem('token', response.accessToken);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      
-      setToken(response.accessToken);
-      setUser(response.user);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `API錯誤: ${response.status}`);
+      }
 
+      // 註冊成功後請用戶登入
+      message.success('註冊成功，請使用帳號登入');
       return true;
     } catch (error: any) {
       console.error('Register error:', error);

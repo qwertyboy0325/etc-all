@@ -194,7 +194,7 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               </Tag>
               
               {/* Debug Info */}
-              {process.env.NODE_ENV === 'development' && (
+              {(import.meta as any).env?.MODE === 'development' && (
                 <Tooltip title={`Email: ${user.email}\nRole: ${user.globalRole}\nToken: ${user.id.substring(0, 8)}...`}>
                   <Tag color="orange" style={{ fontSize: '10px', cursor: 'help' }}>
                     🐛 Debug
