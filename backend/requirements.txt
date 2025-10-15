@@ -21,6 +21,8 @@ mypy==1.7.1
 # Data Processing
 numpy==1.24.4
 pandas==2.0.3
+# Pin bcrypt for passlib compatibility
+bcrypt==3.2.2
 passlib[bcrypt]==1.7.4
 pre-commit==3.6.0
 
@@ -28,6 +30,8 @@ pre-commit==3.6.0
 psutil==5.9.6
 psycopg2-binary==2.9.9
 pydantic-settings==2.1.0
+# Email validation for Pydantic EmailStr
+email-validator==2.1.0.post1
 
 # Testing
 pytest==7.4.3
