@@ -10,7 +10,8 @@ export interface ApiConfig {
 // Default API configuration
 const inferBaseUrl = (): string => {
   const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined;
-  let base = envBase && envBase.length > 0 ? envBase : 'http://localhost:8000';
+  // If no env provided, default to relative path via same-origin reverse proxy
+  let base = envBase && envBase.length > 0 ? envBase : '';
   // Normalize: ensure trailing /api/v1
   if (!base.endsWith('/api/v1')) {
     base = base.replace(/\/$/, '') + '/api/v1';
