@@ -32,7 +32,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
-import { smartApiCall } from '../utils/api';
+import { apiCall } from '../utils/api';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Content } = Layout;
@@ -78,60 +78,13 @@ const ProjectManagement: React.FC = () => {
     loadProjects();
   }, []);
 
-  // Mock data generation function
-  const getMockProjects = (): Project[] => {
-    return [
-      {
-        id: '1',
-        name: '城市車輛檢測專案',
-        description: '針對城市交通場景的車輛類型檢測和標註，包含汽車、貨車、摩托車等多種車型',
-        status: 'active',
-        createdBy: user?.id || '1',
-        createdAt: '2024-01-15T00:00:00Z',
-        updatedAt: '2024-01-20T00:00:00Z',
-        memberCount: 8,
-        taskCount: 45,
-        completedTasks: 32,
-        progress: 71
-      },
-      {
-        id: '2',
-        name: '高速公路車輛識別',
-        description: '高速公路場景下的車輛檢測，重點關注高速行駛車輛的準確識別',
-        status: 'active',
-        createdBy: user?.id || '1',
-        createdAt: '2024-01-10T00:00:00Z',
-        updatedAt: '2024-01-18T00:00:00Z',
-        memberCount: 5,
-        taskCount: 28,
-        completedTasks: 28,
-        progress: 100
-      },
-      {
-        id: '3',
-        name: '停車場車輛分類',
-        description: '停車場環境中的靜態車輛分類，包含轎車、SUV、貨車等類型',
-        status: 'paused',
-        createdBy: user?.id || '1',
-        createdAt: '2024-01-05T00:00:00Z',
-        updatedAt: '2024-01-15T00:00:00Z',
-        memberCount: 3,
-        taskCount: 15,
-        completedTasks: 8,
-        progress: 53
-      }
-    ];
-  };
+  // Removed mock data generation
 
   const loadProjects = async () => {
     setLoading(true);
     try {
-      // Use smart API call with mock fallback
-      const data = await smartApiCall(
-        '/projects',
-        { method: 'GET' },
-        () => getMockProjects()
-      );
+      // Use real API only
+      const data = await apiCall('/projects', { method: 'GET' });
 
       setProjects(Array.isArray(data) ? data : (data as any)?.items || []);
     } catch (error) {
@@ -165,28 +118,10 @@ const ProjectManagement: React.FC = () => {
           require_review: true
         };
 
-        const createdProject = await smartApiCall(
-          '/projects',
-          {
-            method: 'POST',
-            body: JSON.stringify(projectData)
-          },
-          () => {
-            // Mock fallback - 只有在API調用失敗時才使用
-            const mockProject: Project = {
-              id: Date.now().toString(),
-              ...values,
-              createdBy: user?.id || '1',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              memberCount: 1,
-              taskCount: 0,
-              completedTasks: 0,
-              progress: 0
-            };
-            return mockProject;
-          }
-        );
+        const createdProject = await apiCall('/projects', {
+          method: 'POST',
+          body: JSON.stringify(projectData)
+        });
 
         // 處理API響應格式差異
         const newProject: Project = {

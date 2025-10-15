@@ -1,16 +1,15 @@
 import React from 'react';
-import { Layout, Space, Button, Dropdown, Avatar, Typography, Tag } from 'antd';
+import { Layout, Space, Button, Dropdown, Avatar, Typography, Tag, Tooltip } from 'antd';
 import {
   UserOutlined,
   LogoutOutlined,
   SettingOutlined,
   CrownOutlined,
   ToolOutlined,
-  DownOutlined
+  ReloadOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, usePermissions } from '../contexts/AuthContext';
-import ApiModeSwitch from './ApiModeSwitch';
 import type { MenuProps } from 'antd';
 
 const { Header } = Layout;
@@ -23,11 +22,16 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, forceReset } = useAuth();
   const { isAdmin, isSystemAdmin } = usePermissions();
 
   const handleLogout = () => {
     logout();
+    navigate('/login');
+  };
+
+  const handleForceReset = () => {
+    forceReset();
     navigate('/login');
   };
 
@@ -49,6 +53,15 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
         // TODO: Navigate to settings page
         console.log('Navigate to settings');
       }
+    },
+    {
+      type: 'divider'
+    },
+    {
+      key: 'force-reset',
+      icon: <ReloadOutlined />,
+      label: '強制重置認證',
+      onClick: handleForceReset
     },
     {
       type: 'divider'
@@ -168,68 +181,40 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               </Button>
             </Space>
 
+            {/* API Mode Switch removed to avoid UI interference and enforce real API usage */}
+
             {/* User Info */}
-            <Space style={{ marginLeft: 'auto' }}>
-              {/* Debug: 顯示當前用戶資訊 */}
-              <Text type="secondary" style={{ fontSize: '12px' }}>
-                用戶: {user?.email} | 權限: {user?.globalRole} | Token: {localStorage.getItem('token')?.substring(0, 20)}...
-              </Text>
+            <Space>
+              <Tag 
+                icon={getRoleIcon()} 
+                color={getRoleColor()}
+                style={{ margin: 0 }}
+              >
+                {getRoleText()}
+              </Tag>
               
-              {/* Debug: Quick Admin Login Button */}
-              {user?.globalRole !== 'admin' && (
-                <Button 
-                  size="small" 
-                  type="dashed" 
-                  onClick={async () => {
-                    logout();
-                    // 短暫延遲後跳轉到登入頁面並自動填入admin帳號
-                    setTimeout(() => {
-                      navigate('/login?email=admin@etc.com&password=admin');
-                    }, 100);
-                  }}
-                  style={{ fontSize: '10px', height: '24px' }}
-                >
-                  切換Admin
-                </Button>
+              {/* Debug Info */}
+              {process.env.NODE_ENV === 'development' && (
+                <Tooltip title={`Email: ${user.email}\nRole: ${user.globalRole}\nToken: ${user.id.substring(0, 8)}...`}>
+                  <Tag color="orange" style={{ fontSize: '10px', cursor: 'help' }}>
+                    🐛 Debug
+                  </Tag>
+                </Tooltip>
               )}
               
-              {/* API Mode Switch */}
-              <ApiModeSwitch compact={true} />
-              
-              <Dropdown
-                menu={{
-                  items: [
-                    {
-                      key: 'profile',
-                      label: '個人資料',
-                      icon: <UserOutlined />,
-                      onClick: () => navigate('/profile')
-                    },
-                    {
-                      key: 'settings',
-                      label: '系統設定',
-                      icon: <SettingOutlined />,
-                      onClick: () => navigate('/settings')
-                    },
-                    {
-                      type: 'divider'
-                    },
-                    {
-                      key: 'logout',
-                      label: '登出',
-                      icon: <LogoutOutlined />,
-                      danger: true,
-                      onClick: logout
-                    }
-                  ]
-                }}
-                trigger={['click']}
+              <Dropdown 
+                menu={{ items: userMenuItems }}
+                placement="bottomRight"
+                arrow
               >
-                <Button type="text" style={{ height: '40px', padding: '0 12px' }}>
+                <Button type="text" style={{ padding: '4px 8px' }}>
                   <Space>
-                    <Avatar size="small" icon={<UserOutlined />} />
-                    <Text style={{ color: '#fff' }}>{user?.fullName || user?.email}</Text>
-                    <DownOutlined style={{ color: '#fff', fontSize: '10px' }} />
+                    <Avatar 
+                      size="small" 
+                      icon={<UserOutlined />}
+                      style={{ backgroundColor: '#1890ff' }}
+                    />
+                    <Text strong>{user.fullName}</Text>
                   </Space>
                 </Button>
               </Dropdown>

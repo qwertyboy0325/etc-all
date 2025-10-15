@@ -25,7 +25,7 @@ import Navbar from '../components/Navbar';
 import TaskBoard from '../components/TaskBoard';
 import TaskCreateModal, { TaskFormData } from '../components/TaskCreateModal';
 import TaskList from '../components/TaskList';
-import { smartApiCall } from '../utils/api';
+import { apiCall } from '../utils/api';
 // import TaskStatsCard from '../components/TaskStatsCard';
 import { 
   Task, TaskStatus, TaskPriority, TaskFilter, TaskStats,
@@ -64,157 +64,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     }
   }, [projectId, filters, pagination.current, searchTerm]);
 
-  // Mock data generation function
-  const getMockTasks = (): Task[] => {
-    const mockTasks: Task[] = [
-      {
-        id: '1',
-        project_id: projectId || '1',
-        name: '城市道路車輛檢測',
-        description: '標注城市道路中的各種車輛類型，包括轎車、貨車、摩托車等',
-        status: TaskStatus.IN_PROGRESS,
-        priority: TaskPriority.HIGH,
-        max_annotations: 1,
-        require_review: true,
-        due_date: '2024-02-15',
-        assigned_to: '2',
-        created_by: user?.id || '1',
-        pointcloud_file_id: 'file_1',
-        pointcloud_file: {
-          id: 'file_1',
-          original_filename: 'city_road_001.npy',
-          file_size: 25600000,
-          point_count: 128000
-        },
-        assignee: {
-          id: '2',
-          full_name: '張小明',
-          email: 'zhang@etc.com'
-        },
-        created_at: '2024-01-20T00:00:00Z',
-        updated_at: '2024-01-25T00:00:00Z',
-        is_overdue: false,
-        is_completed: false,
-        annotation_count: 1,
-        completion_rate: 65
-      },
-      {
-        id: '2',
-        project_id: projectId || '1',
-        name: '高速公路車輛識別',
-        description: '高速公路場景下的車輛檢測和分類',
-        status: TaskStatus.COMPLETED,
-        priority: TaskPriority.MEDIUM,
-        max_annotations: 1,
-        require_review: false,
-        due_date: '2024-01-30',
-        assigned_to: '3',
-        created_by: user?.id || '1',
-        pointcloud_file_id: 'file_2',
-        pointcloud_file: {
-          id: 'file_2',
-          original_filename: 'highway_001.npz',
-          file_size: 18400000,
-          point_count: 92000
-        },
-        assignee: {
-          id: '3',
-          full_name: '李小華',
-          email: 'li@etc.com'
-        },
-        created_at: '2024-01-15T00:00:00Z',
-        updated_at: '2024-01-28T00:00:00Z',
-        is_overdue: false,
-        is_completed: true,
-        annotation_count: 1,
-        completion_rate: 100
-      },
-      {
-        id: '3',
-        project_id: projectId || '1',
-        name: '停車場車輛分類',
-        description: '停車場環境中靜態車輛的類型標注',
-        status: TaskStatus.PENDING,
-        priority: TaskPriority.LOW,
-        max_annotations: 1,
-        require_review: true,
-        due_date: '2024-02-20',
-        created_by: user?.id || '1',
-        pointcloud_file_id: 'file_3',
-        pointcloud_file: {
-          id: 'file_3',
-          original_filename: 'parking_lot_001.ply',
-          file_size: 32100000,
-          point_count: 160000
-        },
-        created_at: '2024-01-22T00:00:00Z',
-        updated_at: '2024-01-22T00:00:00Z',
-        is_overdue: false,
-        is_completed: false,
-        annotation_count: 0,
-        completion_rate: 0
-      },
-      {
-        id: '4',
-        project_id: projectId || '1',
-        name: '交叉路口車輛追蹤',
-        description: '複雜交叉路口場景下的車輛檢測與追蹤',
-        status: TaskStatus.ASSIGNED,
-        priority: TaskPriority.URGENT,
-        max_annotations: 2,
-        require_review: true,
-        due_date: '2024-02-10',
-        assigned_to: '4',
-        created_by: user?.id || '1',
-        pointcloud_file_id: 'file_4',
-        pointcloud_file: {
-          id: 'file_4',
-          original_filename: 'intersection_001.npy',
-          file_size: 45200000,
-          point_count: 226000
-        },
-        assignee: {
-          id: '4',
-          full_name: '王小紅',
-          email: 'wang@etc.com'
-        },
-        created_at: '2024-01-25T00:00:00Z',
-        updated_at: '2024-01-26T00:00:00Z',
-        is_overdue: true,
-        is_completed: false,
-        annotation_count: 0,
-        completion_rate: 15
-      }
-    ];
-
-    // Filter tasks based on current filters
-    let filteredTasks = mockTasks;
-    
-    if (filters.status) {
-      filteredTasks = filteredTasks.filter(task => task.status === filters.status);
-    }
-    
-    if (filters.priority) {
-      filteredTasks = filteredTasks.filter(task => task.priority === filters.priority);
-    }
-    
-    if (filters.assigned_to) {
-      filteredTasks = filteredTasks.filter(task => task.assigned_to === filters.assigned_to);
-    }
-    
-    if (searchTerm) {
-      filteredTasks = filteredTasks.filter(task => 
-        task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (filters.overdue_only) {
-      filteredTasks = filteredTasks.filter(task => task.is_overdue);
-    }
-
-    return filteredTasks;
-  };
+  // Removed mock data generation
 
   // API functions
   const loadTasks = async () => {
@@ -233,15 +83,8 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
         ...(filters.overdue_only && { overdue_only: 'true' })
       });
 
-      // Use smart API call with mock fallback
-      const data = await smartApiCall(
-        `/projects/${projectId}/tasks?${params}`,
-        {},
-        () => {
-          const mockData = getMockTasks();
-          return { items: mockData, total: mockData.length };
-        }
-      );
+      // Use real API only
+      const data = await apiCall(`/projects/${projectId}/tasks?${params}`);
 
       setTasks(data.items || data);
       setPagination(prev => ({
@@ -257,40 +100,14 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     }
   };
 
-  // Mock stats generation function
-  const getMockStats = (): TaskStats => {
-    return {
-      total_tasks: tasks.length,
-      pending_tasks: tasks.filter(t => t.status === TaskStatus.PENDING).length,
-      assigned_tasks: tasks.filter(t => t.status === TaskStatus.ASSIGNED).length,
-      in_progress_tasks: tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
-      completed_tasks: tasks.filter(t => t.status === TaskStatus.COMPLETED).length,
-      overdue_tasks: tasks.filter(t => t.is_overdue).length,
-      completion_rate: tasks.length > 0 
-        ? Math.round(tasks.reduce((sum, t) => sum + t.completion_rate, 0) / tasks.length)
-        : 0,
-      status_breakdown: {
-        [TaskStatus.PENDING]: tasks.filter(t => t.status === TaskStatus.PENDING).length,
-        [TaskStatus.ASSIGNED]: tasks.filter(t => t.status === TaskStatus.ASSIGNED).length,
-        [TaskStatus.IN_PROGRESS]: tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length,
-        [TaskStatus.COMPLETED]: tasks.filter(t => t.status === TaskStatus.COMPLETED).length,
-        [TaskStatus.REVIEWED]: tasks.filter(t => t.status === TaskStatus.REVIEWED).length,
-        [TaskStatus.REJECTED]: tasks.filter(t => t.status === TaskStatus.REJECTED).length,
-        [TaskStatus.CANCELLED]: tasks.filter(t => t.status === TaskStatus.CANCELLED).length,
-      }
-    };
-  };
+  // Removed mock stats generation
 
   const loadStats = async () => {
     if (!projectId) return;
     
     try {
-      // Use smart API call with mock fallback
-      const data = await smartApiCall(
-        `/projects/${projectId}/tasks/stats`,
-        {},
-        () => getMockStats()
-      );
+      // Use real API only
+      const data = await apiCall(`/projects/${projectId}/tasks/stats`);
       
       setStats(data);
     } catch (error) {

@@ -8,7 +8,6 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import ApiModeSwitch from '../components/ApiModeSwitch';
 import Navbar from '../components/Navbar';
 
 const { Content } = Layout;
@@ -102,9 +101,7 @@ const Landing: React.FC = () => {
                 </Row>
               </Card>
             </Col>
-            <Col xs={24} md={8}>
-              <ApiModeSwitch showCard={true} />
-            </Col>
+            {/* ApiModeSwitch removed */}
           </Row>
 
           {/* Quick Links */}

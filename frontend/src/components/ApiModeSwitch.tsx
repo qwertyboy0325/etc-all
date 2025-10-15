@@ -120,8 +120,8 @@ const ApiModeSwitch: React.FC<ApiModeSwitchProps> = ({
           onChange={handleModeChange}
           style={{ width: 120 }}
           size="small"
-          bordered={false}
-          dropdownMatchSelectWidth={false}
+          variant="borderless"
+          popupMatchSelectWidth={false}
         >
           <Option value="hybrid">
             <Space size="small">

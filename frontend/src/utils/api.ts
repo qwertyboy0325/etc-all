@@ -1,5 +1,5 @@
 // API configuration and utilities
-import { apiConfig, isMockOnlyMode } from '../config/api';
+import { apiConfig } from '../config/api';
 
 export const API_BASE_URL = 'http://localhost:8000/api/v1';
 
@@ -16,10 +16,7 @@ export const getAuthHeaders = () => {
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const config = apiConfig.getConfig();
   
-  // Skip real API if in mock-only mode
-  if (isMockOnlyMode()) {
-    throw new Error('Mock-only mode: Real API disabled');
-  }
+  // Always use real API
   
   const url = `${config.baseUrl}${endpoint}`;
   
@@ -51,45 +48,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   }
 };
 
-// Smart API call that respects the current mode
-export const smartApiCall = async <T>(
-  endpoint: string, 
-  options: RequestInit = {},
-  mockFallback?: () => Promise<T> | T
-): Promise<T> => {
-  const config = apiConfig.getConfig();
-  
-  // Mock-only mode
-  if (isMockOnlyMode()) {
-    if (!mockFallback) {
-      throw new Error('Mock data not available');
-    }
-    console.log(`📱 Mock模式: ${endpoint}`);
-    return await mockFallback();
-  }
-  
-  // Real API mode
-  if (config.mode === 'real') {
-    console.log(`🌐 真實API: ${endpoint}`);
-    return await apiCall(endpoint, options);
-  }
-  
-  // Hybrid mode - try real API first, fallback to mock
-  if (config.mode === 'hybrid') {
-    try {
-      console.log(`🔄 混合模式 (真實API): ${endpoint}`);
-      return await apiCall(endpoint, options);
-    } catch (error) {
-      if (mockFallback) {
-        console.log(`📱 混合模式 (回退Mock): ${endpoint}`, error);
-        return await mockFallback();
-      }
-      throw error;
-    }
-  }
-  
-  throw new Error(`Unknown API mode: ${config.mode}`);
-};
+// smartApiCall removed; always use apiCall
 
 // Common API endpoints
 export const API_ENDPOINTS = {
