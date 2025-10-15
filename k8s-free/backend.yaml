@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: etc-pointcloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8000
+        command: ["/bin/bash"]
+        args: ["-c", "pip install fastapi uvicorn sqlalchemy psycopg2-binary redis minio python-multipart && cd /app && python -m uvicorn main:app --host 0.0.0.0 --port 8000"]
+        env:
+        - name: DB_HOST
+          value: "postgres-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "etc_pointcloud"
+        - name: DB_USER
+          value: "root"
+        - name: DB_PASSWORD
+          value: "root"
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: MINIO_HOST
+          value: "minio-service"
+        - name: MINIO_PORT
+          value: "9000"
+        - name: MINIO_ACCESS_KEY
+          value: "minioadmin"
+        - name: MINIO_SECRET_KEY
+          value: "minioadmin"
+        - name: SECRET_KEY
+          value: "your-secret-key-here"
+        - name: JWT_SECRET_KEY
+          value: "your-jwt-secret-key-here"
+        - name: DEBUG
+          value: "True"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: BACKEND_CORS_ORIGINS
+          value: "*"
+        volumeMounts:
+        - name: backend-code
+          mountPath: /app
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: backend-code
+        configMap:
+          name: backend-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: etc-pointcloud
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: LoadBalancer

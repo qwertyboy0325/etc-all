@@ -1,21 +1,35 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Layout, Card, Row, Col, Typography, Space, Button, Statistic } from 'antd';
 import { 
   ProjectOutlined, 
   UserOutlined, 
   FileTextOutlined,
-  SettingOutlined 
+  SettingOutlined,
+  CheckCircleOutlined,
+  BellOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, usePermissions } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import { apiConfig } from '../config/api';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 
 const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const { isAdmin, isSystemAdmin } = usePermissions();
+
+  // 登入後依角色導向：系統/全域管理 -> 專案總覽；一般用戶 -> 我的任務
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (isSystemAdmin || isAdmin) {
+      navigate('/projects', { replace: true });
+    } else {
+      navigate('/tasks', { replace: true });
+    }
+  }, [isAuthenticated, isAdmin, isSystemAdmin, navigate]);
 
   const quickActions = [
     {
@@ -35,6 +49,18 @@ const Landing: React.FC = () => {
       description: '查看和分析點雲數據',
       icon: <UserOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />,
       action: () => navigate('/viewer')
+    },
+    {
+      title: '審核中心',
+      description: '審核標注結果和質量控制',
+      icon: <CheckCircleOutlined style={{ fontSize: '24px', color: '#722ed1' }} />,
+      action: () => navigate('/reviews')
+    },
+    {
+      title: '通知中心',
+      description: '查看系統通知和消息',
+      icon: <BellOutlined style={{ fontSize: '24px', color: '#eb2f96' }} />,
+      action: () => navigate('/notifications')
     }
   ];
 
@@ -56,7 +82,7 @@ const Landing: React.FC = () => {
           {/* Quick Actions */}
           <Row gutter={[24, 24]} style={{ marginBottom: '50px' }}>
             {quickActions.map((action, index) => (
-              <Col xs={24} sm={12} md={8} key={index}>
+              <Col xs={24} sm={12} md={8} lg={6} key={index}>
                 <Card 
                   hoverable
                   style={{ height: '200px', cursor: 'pointer' }}
@@ -143,7 +169,10 @@ const Landing: React.FC = () => {
                 <Button 
                   type="link" 
                   block 
-                  onClick={() => window.open('http://localhost:8000/api/v1/docs', '_blank')}
+                  onClick={() => {
+                    const baseUrl = apiConfig.getConfig().baseUrl;
+                    window.open(`${baseUrl}/docs`, '_blank');
+                  }}
                 >
                   API文檔
                 </Button>

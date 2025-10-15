@@ -92,7 +92,8 @@ const ApiModeSwitch: React.FC<ApiModeSwitchProps> = ({
 
   const testApiConnection = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/system/health');
+      const baseUrl = apiConfig.getConfig().baseUrl;
+      const response = await fetch(`${baseUrl}/system/health`);
       if (response.ok) {
         console.log('✅ API連接測試成功');
       } else {

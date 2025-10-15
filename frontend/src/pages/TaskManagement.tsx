@@ -32,6 +32,8 @@ import {
   TASK_STATUS_LABELS, TASK_PRIORITY_LABELS 
 } from '../types/task';
 import { getFileList, type FileInfo } from '../services/fileService';
+import { API_BASE_URL, getAuthHeaders } from '../utils/api';
+import { usePermissions } from '../contexts/AuthContext';
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -57,6 +59,8 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     total: 0
   });
   const [availableFiles, setAvailableFiles] = useState<FileInfo[]>([]);
+  const { isAdmin, isSystemAdmin } = usePermissions();
+  const canDelete = isAdmin || isSystemAdmin;
 
   // Effects
   useEffect(() => {
@@ -66,17 +70,27 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     }
   }, [projectId, filters, pagination.current, searchTerm]);
 
-  useEffect(() => {
-    // Load available files for task creation
-    (async () => {
-      try {
-        const files = await getFileList();
-        setAvailableFiles(files);
-      } catch {
-        // ignore
+  const refreshProjectFiles = async () => {
+    try {
+      if (!projectId) return;
+      const res = await fetch(`${API_BASE_URL}/projects/${projectId}/files?page=1&size=100`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableFiles(data.items || data || []);
+      } else {
+        setAvailableFiles([]);
       }
+    } catch {
+      setAvailableFiles([]);
+    }
+  };
+
+  useEffect(() => {
+    // Load available files for task creation (strictly project files)
+    (async () => {
+      await refreshProjectFiles();
     })();
-  }, []);
+  }, [projectId]);
 
   // Removed mock data generation
 
@@ -223,7 +237,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     return (
       <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
         <Navbar />
-        <Content style={{ padding: '24px' }}>
+        <Content style={{ padding: '24px', paddingTop: '128px' }}>
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Title level={3}>請選擇一個專案來查看任務</Title>
           </div>
@@ -236,7 +250,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <Navbar />
       
-      <Content style={{ padding: '24px', paddingTop: '88px' }}>
+      <Content style={{ padding: '24px', paddingTop: '128px' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {/* Header */}
           <Row justify="space-between" align="middle" style={{ marginBottom: '24px' }}>
@@ -382,15 +396,35 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
                   onEdit={(task) => {
                     message.info(`編輯任務: ${task.name}`);
                   }}
+                  onDelete={canDelete ? async (taskId) => {
+                    try {
+                      await apiCall(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
+                      message.success('任務已刪除');
+                      loadTasks();
+                      loadStats();
+                    } catch (e: any) {
+                      message.error(e?.message || '刪除任務失敗');
+                    }
+                  } : undefined}
                 />
               </Card>
             ) : (
-              <TaskBoard
-                tasks={tasks}
-                onAssign={handleAssignTask}
-                onStatusChange={handleStatusChange}
-                projectId={projectId}
-              />
+               <TaskBoard
+                 tasks={tasks}
+                 onAssign={handleAssignTask}
+                 onStatusChange={handleStatusChange}
+                 projectId={projectId}
+                 onDelete={canDelete ? async (taskId) => {
+                   try {
+                     await apiCall(`/projects/${projectId}/tasks/${taskId}`, { method: 'DELETE' });
+                     message.success('任務已刪除');
+                     loadTasks();
+                     loadStats();
+                   } catch (e: any) {
+                     message.error(e?.message || '刪除任務失敗');
+                   }
+                 } : undefined}
+               />
             )}
           </Spin>
 
@@ -402,6 +436,7 @@ const TaskManagement: React.FC<TaskManagementProps> = () => {
             loading={loading}
             projectId={projectId || ''}
             availableFiles={availableFiles}
+            onRefreshFiles={refreshProjectFiles}
           />
         </div>
       </Content>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, App as AntdApp } from 'antd';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
@@ -9,6 +9,11 @@ import PointCloudViewerPage from './pages/PointCloudViewer';
 import TaskManagement from './pages/TaskManagement';
 import AnnotationPage from './pages/AnnotationPage';
 import ProjectManagement from './pages/ProjectManagement';
+import ReviewDashboard from './pages/ReviewDashboard';
+import NotificationCenter from './pages/NotificationCenter';
+import PointCloudConfigDemo from './pages/PointCloudConfigDemo';
+import MyTasks from './pages/MyTasks';
+import UserManagement from './pages/UserManagement';
 import './App.css';
 
 // Global error boundary component
@@ -60,72 +65,106 @@ function App() {
           },
         }}
       >
-        <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            
-            {/* Protected routes */}
-            <Route 
-              path="/" 
-              element={
-                <ProtectedRoute>
-                  <Landing />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/viewer" 
-              element={
-                <ProtectedRoute>
-                  <PointCloudViewerPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/:projectId/tasks" 
-              element={
-                <ProtectedRoute>
-                  <TaskManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects/:projectId/tasks/:taskId/annotate" 
-              element={
-                <ProtectedRoute>
-                  <AnnotationPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/tasks" 
-              element={
-                <ProtectedRoute>
-                  <TaskManagement />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/projects" 
-              element={
-                <ProtectedRoute>
-                  <ProjectManagement />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Catch all - redirect to login */}
-            <Route 
-              path="*" 
-              element={
-                <ProtectedRoute>
-                  <Landing />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-        </AuthProvider>
+        <AntdApp>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              
+              {/* Protected routes */}
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <Landing />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/viewer" 
+                element={
+                  <ProtectedRoute>
+                    <PointCloudViewerPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/pointcloud-config" 
+                element={
+                  <ProtectedRoute>
+                    <PointCloudConfigDemo />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/projects/:projectId/tasks" 
+                element={
+                  <ProtectedRoute>
+                    <TaskManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/projects/:projectId/tasks/:taskId/annotate" 
+                element={
+                  <ProtectedRoute>
+                    <AnnotationPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/tasks" 
+                element={
+                  <ProtectedRoute>
+                    <MyTasks />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/projects" 
+                element={
+                  <ProtectedRoute>
+                    <ProjectManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/reviews" 
+                element={
+                  <ProtectedRoute>
+                    <ReviewDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/notifications" 
+                element={
+                  <ProtectedRoute>
+                    <NotificationCenter />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/users" 
+                element={
+                  <ProtectedRoute>
+                    <UserManagement />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Catch all - redirect to login */}
+              <Route 
+                path="*" 
+                element={
+                  <ProtectedRoute>
+                    <Landing />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+          </AuthProvider>
+        </AntdApp>
       </ConfigProvider>
     </ErrorBoundary>
   );

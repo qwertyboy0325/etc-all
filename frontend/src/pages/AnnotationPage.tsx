@@ -71,10 +71,10 @@ const AnnotationPage: React.FC = () => {
   const [selectedPoints, setSelectedPoints] = useState<any>({ indices: [], coordinates: [] });
   const [pointCloudData, setPointCloudData] = useState<Float32Array>();
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-  const [annotations] = useState<any[]>([]);
+  const [annotations, setAnnotations] = useState<any[]>([]);
 
-  // TODO: 改為從後端載入車種
-  const mockVehicleTypes: VehicleType[] = [
+  // 車種：優先從後端載入，失敗則退回靜態清單
+  const fallbackVehicleTypes: VehicleType[] = [
     { id: 'car', name: '小客車', code: 'CAR', description: '一般乘用車' },
     { id: 'truck', name: '貨車', code: 'TRUCK', description: '商用貨車' },
     { id: 'motorcycle', name: '機車', code: 'MOTORCYCLE', description: '機車、摩托車' },
@@ -114,7 +114,36 @@ const AnnotationPage: React.FC = () => {
       const parsed = parseNpyFile(arrayBuf);
       setPointCloudData(parsed.data);
 
-      setVehicleTypes(mockVehicleTypes);
+      // 3) 載入任務既有標注
+      try {
+        const annList = await apiCall(`/projects/${projectId}/tasks/${taskId}/annotations`);
+        const colorPalette = ['#ff7875', '#ffa940', '#ffd666', '#95de64', '#5cdbd3', '#69c0ff', '#b37feb', '#ff85c0'];
+        const mapped = (annList || []).map((a: any, idx: number) => ({
+          id: a.id,
+          vehicleType: a.vehicle_type_id || a.vehicleTypeId || 'unknown',
+          confidence: a.confidence ?? 0.8,
+          points: a.annotation_data?.selected_points || [],
+          color: colorPalette[idx % colorPalette.length],
+          visible: true,
+        }));
+        setAnnotations(mapped);
+      } catch (_) {
+        // ignore listing error to not block page
+      }
+
+      // 4) 車種列表
+      try {
+        const vts = await apiCall(`/projects/${projectId}/vehicle-types`);
+        const mappedVTs: VehicleType[] = (vts || []).map((v: any) => ({
+          id: v.id,
+          name: v.name,
+          code: v.code,
+          description: v.description,
+        }));
+        setVehicleTypes(mappedVTs.length > 0 ? mappedVTs : fallbackVehicleTypes);
+      } catch (_) {
+        setVehicleTypes(fallbackVehicleTypes);
+      }
 
       message.success('標注環境載入完成');
     } catch (error) {
@@ -285,7 +314,7 @@ const AnnotationPage: React.FC = () => {
       <Navbar />
       
       {/* Content */}
-      <Content style={{ padding: '24px', paddingTop: '88px' }}>
+      <Content style={{ padding: '24px', paddingTop: '104px' }}>
         {/* Navigation */}
         <Card size="small" style={{ marginBottom: 16 }}>
           <Row justify="space-between" align="middle">

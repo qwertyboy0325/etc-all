@@ -17,7 +17,8 @@ import {
   Col,
   Statistic,
   Progress,
-  Tooltip
+  Tooltip,
+  Upload
 } from 'antd';
 import {
   PlusOutlined,
@@ -33,6 +34,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import { apiCall } from '../utils/api';
+import { uploadProjectFile, uploadProjectFiles, uploadProjectArchive, type FileUploadResponse } from '../services/fileService';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Content } = Layout;
@@ -64,7 +66,7 @@ interface ProjectFormData {
 const ProjectManagement: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { canCreateProjects } = usePermissions();
+  const { canCreateProjects, isSystemAdmin } = usePermissions();
 
   // State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -72,6 +74,34 @@ const ProjectManagement: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [form] = Form.useForm();
+  const [uploading, setUploading] = useState(false);
+  const [bulkTargetProjectId, setBulkTargetProjectId] = useState<string | null>(null);
+  const [assignAdminOpen, setAssignAdminOpen] = useState<{open: boolean, projectId?: string}>({ open: false });
+  const [assignUserId, setAssignUserId] = useState<string | undefined>();
+  const [userOptions, setUserOptions] = useState<{label: string, value: string}[]>([]);
+
+  const openAssignAdmin = async (projectId: string) => {
+    setAssignAdminOpen({ open: true, projectId });
+    setAssignUserId(undefined);
+    try {
+      const data = await apiCall('/users');
+      const opts = (Array.isArray(data) ? data : data.items || []).map((u: any) => ({ label: u.full_name || u.email, value: u.id }));
+      setUserOptions(opts);
+    } catch (e: any) {
+      message.error(e?.message || '載入使用者失敗');
+    }
+  };
+
+  const doAssignAdmin = async () => {
+    if (!assignAdminOpen.projectId || !assignUserId) return;
+    try {
+      await apiCall(`/projects/${assignAdminOpen.projectId}/members/assign-admin?user_id=${assignUserId}`, { method: 'POST' });
+      message.success('已指派為專案管理員');
+      setAssignAdminOpen({ open: false });
+    } catch (e: any) {
+      message.error(e?.message || '指派失敗');
+    }
+  };
 
   // Load projects
   useEffect(() => {
@@ -164,11 +194,12 @@ const ProjectManagement: React.FC = () => {
   // Handle delete project
   const handleDelete = async (projectId: string) => {
     try {
+      await apiCall(`/projects/${projectId}`, { method: 'DELETE' });
       setProjects(prev => prev.filter(p => p.id !== projectId));
       message.success('專案删除成功');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete project error:', error);
-      message.error('删除失敗');
+      message.error(error?.message || '删除失敗');
     }
   };
 
@@ -281,6 +312,65 @@ const ProjectManagement: React.FC = () => {
               onClick={() => navigate(`/projects/${record.id}/tasks`)}
             />
           </Tooltip>
+          {canCreateProjects && (
+            <>
+              <Upload
+                multiple
+                disabled={uploading}
+                beforeUpload={() => false}
+                showUploadList={false}
+                onChange={async (info) => {
+                  const files = info.fileList.map(f => f.originFileObj as File).filter(Boolean);
+                  if (!files.length) return;
+                  setUploading(true);
+                  setBulkTargetProjectId(record.id);
+                  try {
+                    const resps: FileUploadResponse[] = await uploadProjectFiles(record.id, files);
+                    message.success(`已上傳 ${resps.length} 個文件`);
+                  } catch (e: any) {
+                    message.error(e?.message || '批量上傳失敗');
+                  } finally {
+                    setUploading(false);
+                    setBulkTargetProjectId(null);
+                  }
+                }}
+              >
+                <Tooltip title="批量上傳點雲">
+                  <Button type="text" loading={uploading && bulkTargetProjectId===record.id}>
+                    上傳
+                  </Button>
+                </Tooltip>
+              </Upload>
+
+              <Upload
+                accept=".zip"
+                disabled={uploading}
+                beforeUpload={() => false}
+                showUploadList={false}
+                onChange={async (info) => {
+                  const zip = info.file.originFileObj as File;
+                  if (!zip) return;
+                  setUploading(true);
+                  setBulkTargetProjectId(record.id);
+                  try {
+                    const resps = await uploadProjectArchive(record.id, zip);
+                    message.success(`ZIP 解析成功，上傳 ${resps.length} 個文件`);
+                  } catch (e: any) {
+                    message.error(e?.message || 'ZIP 上傳失敗');
+                  } finally {
+                    setUploading(false);
+                    setBulkTargetProjectId(null);
+                  }
+                }}
+              >
+                <Tooltip title="上傳ZIP (含多個NPY/NPZ)">
+                  <Button type="text" loading={uploading && bulkTargetProjectId===record.id}>
+                    上傳ZIP
+                  </Button>
+                </Tooltip>
+              </Upload>
+            </>
+          )}
           
           {canCreateProjects && (
             <>
@@ -318,6 +408,13 @@ const ProjectManagement: React.FC = () => {
                   />
                 </Tooltip>
               </Popconfirm>
+              {isSystemAdmin && (
+                <Tooltip title="指派管理員">
+                  <Button type="text" onClick={() => openAssignAdmin(record.id)}>
+                    指派管理員
+                  </Button>
+                </Tooltip>
+              )}
             </>
           )}
         </Space>
@@ -348,14 +445,16 @@ const ProjectManagement: React.FC = () => {
               <Text type="secondary">管理和監控所有點雲標注專案</Text>
             </Col>
             <Col>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => openModal()}
-                size="large"
-              >
-                創建專案
-              </Button>
+              {canCreateProjects && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => openModal()}
+                  size="large"
+                >
+                  創建專案
+                </Button>
+              )}
               {/* Debug: canCreateProjects = {String(canCreateProjects)}, user role = {user?.globalRole} */}
             </Col>
           </Row>
@@ -485,6 +584,28 @@ const ProjectManagement: React.FC = () => {
                     {editingProject ? '更新' : '創建'}
                   </Button>
                 </Space>
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          {/* Assign Admin Modal */}
+          <Modal
+            title="指派專案管理員"
+            open={assignAdminOpen.open}
+            onCancel={() => setAssignAdminOpen({ open: false })}
+            onOk={doAssignAdmin}
+            okText="指派"
+          >
+            <Form layout="vertical">
+              <Form.Item label="選擇使用者">
+                <Select
+                  showSearch
+                  placeholder="搜尋使用者"
+                  options={userOptions}
+                  value={assignUserId}
+                  onChange={setAssignUserId as any}
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Form>
           </Modal>

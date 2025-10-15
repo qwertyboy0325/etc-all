@@ -8,9 +8,19 @@ export interface ApiConfig {
 }
 
 // Default API configuration
+const inferBaseUrl = (): string => {
+  const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined;
+  let base = envBase && envBase.length > 0 ? envBase : 'http://localhost:8000';
+  // Normalize: ensure trailing /api/v1
+  if (!base.endsWith('/api/v1')) {
+    base = base.replace(/\/$/, '') + '/api/v1';
+  }
+  return base;
+};
+
 const defaultConfig: ApiConfig = {
-  baseUrl: 'http://localhost:8000/api/v1',
-  mode: ((globalThis as any).import?.meta?.env?.VITE_APP_API_MODE as 'mock' | 'real' | 'hybrid') || 'hybrid',
+  baseUrl: inferBaseUrl(),
+  mode: 'real',
   timeout: 10000,
   retryAttempts: 2
 };

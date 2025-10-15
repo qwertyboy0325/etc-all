@@ -3,6 +3,7 @@ import { Layout, Card, Select, Button, message, Upload, Space, Typography, Row, 
 import { UploadOutlined, ReloadOutlined, EyeOutlined, DownloadOutlined } from '@ant-design/icons';
 import Navbar from '../components/Navbar';
 import { PointCloudRenderer, PointCloudData, PointCloudRendererRef } from '../components/PointCloudRenderer';
+import PointCloudControls, { PointCloudConfig } from '../components/PointCloudControls';
 import { getFileList, downloadFile, uploadFile, generateSampleFiles, formatFileSize, formatDate, validateFileFormat, FileInfo } from '../services/fileService';
 
 const { Content } = Layout;
@@ -12,28 +13,50 @@ const { Option } = Select;
 const PointCloudViewer: React.FC = () => {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string>('');
-  const [pointCloudData] = useState<PointCloudData | null>(null);
+  const [pointCloudData, setPointCloudData] = useState<PointCloudData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [generatingSamples, setGeneratingSamples] = useState(false);
   const [uploading, setUploading] = useState(false);
   const rendererRef = useRef<PointCloudRendererRef>(null);
 
+  // 點雲配置狀態
+  const [config, setConfig] = useState<PointCloudConfig>({
+    pointSize: 2,
+    pointColor: '#00ff00',
+    backgroundColor: '#000000',
+    showAxes: true,
+    showGrid: false,
+    autoRotate: false,
+    rotationSpeed: 1,
+    opacity: 1,
+    rotationX: 0,
+    rotationY: 0,
+    rotationZ: 0,
+    coordinateSystem: 'y-up',
+    autoRotateNpz: true,
+  });
+
   // 載入文件列表
   const loadFilesList = async () => {
     try {
       setLoading(true);
       setError(undefined);
+      console.log('Loading file list...');
       const fileList = await getFileList();
+      console.log('File list loaded:', fileList);
       setFiles(fileList);
       
       if (fileList.length === 0) {
         message.info('沒有找到點雲文件，請先上傳或生成示例文件');
+      } else {
+        message.success(`成功載入 ${fileList.length} 個文件`);
       }
     } catch (err) {
       console.error('Failed to load files:', err);
-      setError('載入文件列表失敗');
-      message.error('載入文件列表失敗');
+      const errorMessage = err instanceof Error ? err.message : '載入文件列表失敗';
+      setError(errorMessage);
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -48,21 +71,64 @@ const PointCloudViewer: React.FC = () => {
 
     try {
       const arrayBuffer = await downloadFile(fileId);
+      const file = files.find(f => f.id === fileId);
       
-      // 使用渲染器的載入方法
-      if (rendererRef.current?.loadFromArrayBuffer) {
-        await rendererRef.current.loadFromArrayBuffer(arrayBuffer);
-        setSelectedFileId(fileId);
-        message.success('點雲文件載入成功！');
+      // 解析點雲數據
+      let pointCloudData: PointCloudData;
+      if (file?.original_filename?.endsWith('.npz')) {
+        const { extractPointCloudFromNpzBuffer } = await import('../utils/npzParser');
+        pointCloudData = await extractPointCloudFromNpzBuffer(arrayBuffer);
       } else {
-        throw new Error('Renderer not ready');
+        const { parseNpyFile, calculateBounds } = await import('../utils/npyParser');
+        const npyData = parseNpyFile(arrayBuffer);
+        pointCloudData = {
+          positions: npyData.data,
+          pointCount: npyData.shape[0],
+          bounds: calculateBounds(npyData.data)
+        };
       }
+      
+      setPointCloudData(pointCloudData);
+      setSelectedFileId(fileId);
+      message.success('點雲文件載入成功！');
     } catch (err) {
+      console.error('Failed to load file:', err);
       setError('載入文件失敗');
       message.error('載入文件失敗');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 處理配置變更
+  const handleConfigChange = (newConfig: PointCloudConfig) => {
+    setConfig(newConfig);
+  };
+
+  // 重置配置
+  const handleResetConfig = () => {
+    setConfig({
+      pointSize: 2,
+      pointColor: '#00ff00',
+      backgroundColor: '#000000',
+      showAxes: true,
+      showGrid: false,
+      autoRotate: false,
+      rotationSpeed: 1,
+      opacity: 1,
+      rotationX: 0,
+      rotationY: 0,
+      rotationZ: 0,
+      coordinateSystem: 'y-up',
+      autoRotateNpz: true,
+    });
+    message.info('配置已重置');
+  };
+
+  // 適應視圖
+  const handleFitToView = () => {
+    rendererRef.current?.fitToView();
+    message.info('視圖已適應');
   };
 
   // 生成示例文件
@@ -128,10 +194,11 @@ const PointCloudViewer: React.FC = () => {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Navbar />
-      <Content style={{ padding: '24px', background: '#f0f2f5' }}>
+      <Content style={{ padding: '24px', background: '#f5f7fa', overflow: 'auto' }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <Row gutter={[24, 24]}>
           {/* 左側控制面板 */}
-          <Col xs={24} lg={8}>
+          <Col xs={24} lg={6}>
             <Card title="文件管理" extra={
               <Space>
                 <Button 
@@ -175,6 +242,8 @@ const PointCloudViewer: React.FC = () => {
                   value={selectedFileId}
                   onChange={handleFileSelect}
                   loading={loading}
+                  dropdownStyle={{ zIndex: 2000 }}
+                  getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
                   popupMatchSelectWidth={false}
                   notFoundContent={
                     <div style={{ padding: '16px', textAlign: 'center' }}>
@@ -222,21 +291,17 @@ const PointCloudViewer: React.FC = () => {
           </Col>
 
           {/* 右側3D視圖 */}
-          <Col xs={24} lg={16}>
+          <Col xs={24} lg={18}>
             <Card 
               title="3D 點雲查看器" 
-              style={{ height: '600px' }}
+              style={{ height: '60vh', minHeight: 420 }}
               styles={{ body: { padding: 0, height: '100%' } }}
             >
               <div style={{ position: 'relative', width: '100%', height: '100%' }}>
                 <PointCloudRenderer
                   ref={rendererRef}
                   data={pointCloudData}
-                  width={800}
-                  height={600}
-                  backgroundColor="#000000"
-                  pointSize={2}
-                  pointColor="#ffffff"
+                  config={config}
                   onLoad={handleRendererLoad}
                   onError={handleRendererError}
                 />
@@ -289,6 +354,20 @@ const PointCloudViewer: React.FC = () => {
             </Card>
           </Col>
         </Row>
+
+        {/* 點雲配置區域 */}
+        <Row gutter={[24, 24]} style={{ marginTop: 16 }}>
+          <Col xs={24}>
+            <PointCloudControls
+              config={config}
+              onConfigChange={handleConfigChange}
+              onReset={handleResetConfig}
+              onFitToView={handleFitToView}
+              disabled={!pointCloudData}
+            />
+          </Col>
+        </Row>
+        </div>
       </Content>
     </Layout>
   );

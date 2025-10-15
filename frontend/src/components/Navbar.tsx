@@ -101,10 +101,11 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
     <Header style={{
       position: 'sticky',
       top: 0,
-      zIndex: 1000,
+      zIndex: 900,
       width: '100%',
       display: 'flex',
       alignItems: 'center',
+      height: 64,
       background: '#fff',
       borderBottom: '1px solid #f0f0f0',
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -163,6 +164,15 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               </Button>
               <Button 
                 type="text" 
+                onClick={() => navigate('/pointcloud-config')}
+                style={{ 
+                  color: location.pathname === '/pointcloud-config' ? '#1890ff' : undefined 
+                }}
+              >
+                點雲配置
+              </Button>
+              <Button 
+                type="text" 
                 onClick={() => navigate('/projects')}
                 style={{ 
                   color: location.pathname === '/projects' ? '#1890ff' : undefined 
@@ -179,6 +189,35 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               >
                 任務管理
               </Button>
+              <Button 
+                type="text" 
+                onClick={() => navigate('/reviews')}
+                style={{ 
+                  color: location.pathname === '/reviews' ? '#1890ff' : undefined 
+                }}
+              >
+                審核中心
+              </Button>
+              <Button 
+                type="text" 
+                onClick={() => navigate('/notifications')}
+                style={{ 
+                  color: location.pathname === '/notifications' ? '#1890ff' : undefined 
+                }}
+              >
+                通知中心
+              </Button>
+              {(isAdmin || isSystemAdmin) && (
+                <Button 
+                  type="text" 
+                  onClick={() => navigate('/admin/users')}
+                  style={{ 
+                    color: location.pathname === '/admin/users' ? '#1890ff' : undefined 
+                  }}
+                >
+                  使用者管理
+                </Button>
+              )}
             </Space>
 
             {/* API Mode Switch removed to avoid UI interference and enforce real API usage */}

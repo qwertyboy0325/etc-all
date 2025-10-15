@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { apiConfig } from '../config/api'
 
-// API base URL - 應該從環境變量載入
-const API_BASE_URL = 'http://localhost:8000/api/v1'
+// API base URL - 由配置推斷
+const API_BASE_URL = apiConfig.getConfig().baseUrl
 
 // Point cloud data interface
 export interface PointCloudData {

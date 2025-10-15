@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-config
+  namespace: etc-pointcloud
+data:
+  # Database configuration
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "etc_pointcloud"
+  DB_USER: "root"
+  DB_PASSWORD: "root"
+  
+  # Redis configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # MinIO configuration
+  MINIO_HOST: "minio-service"
+  MINIO_PORT: "9000"
+  MINIO_ACCESS_KEY: "minioadmin"
+  MINIO_SECRET_KEY: "minioadmin"
+  MINIO_BUCKET: "pointcloud-files"
+  MINIO_SECURE: "false"
+  
+  # Application configuration
+  DEBUG: "True"
+  ENVIRONMENT: "production"
+  SECRET_KEY: "your-secret-key-here"
+  JWT_SECRET_KEY: "your-jwt-secret-key-here"
+  
+  # CORS configuration
+  BACKEND_CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"

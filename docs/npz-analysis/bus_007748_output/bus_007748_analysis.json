@@ -1,0 +1,97 @@
+{
+  "structure": {
+    "file_name": "bus_007748.npz",
+    "file_size_mb": 0.17717742919921875,
+    "arrays": {
+      "car_type": {
+        "shape": [],
+        "dtype": "int32",
+        "size": 1,
+        "memory_usage_mb": 3.814697265625e-06,
+        "is_numeric": true,
+        "min_value": -1.0,
+        "max_value": -1.0,
+        "mean_value": -1.0,
+        "std_value": 0.0
+      },
+      "pts": {
+        "shape": [
+          7690,
+          3
+        ],
+        "dtype": "float64",
+        "size": 23070,
+        "memory_usage_mb": 0.1760101318359375,
+        "is_numeric": true,
+        "min_value": -3.159992282359537,
+        "max_value": 13.14739366071961,
+        "mean_value": 1.6073104415869712,
+        "std_value": 2.6641095907626937
+      },
+      "raw_file": {
+        "shape": [],
+        "dtype": "<U35",
+        "size": 1,
+        "memory_usage_mb": 0.000133514404296875,
+        "is_numeric": false,
+        "min_value": null,
+        "max_value": null,
+        "mean_value": null,
+        "std_value": null,
+        "sample_values": [
+          "output_856.csv_aligned_row_data.txt"
+        ]
+      },
+      "image_file": {
+        "shape": [],
+        "dtype": "<U18",
+        "size": 1,
+        "memory_usage_mb": 6.866455078125e-05,
+        "is_numeric": false,
+        "min_value": null,
+        "max_value": null,
+        "mean_value": null,
+        "std_value": null,
+        "sample_values": [
+          "output_856.csv.jpg"
+        ]
+      }
+    }
+  },
+  "point_cloud": {
+    "car_type": {
+      "is_point_cloud": false,
+      "description": "Shape: (), 可能不是點雲數據"
+    },
+    "pts": {
+      "is_point_cloud": true,
+      "num_points": 7690,
+      "dimensions": 3,
+      "x_range": [
+        1.818377558331479,
+        5.433347219513104
+      ],
+      "y_range": [
+        1.3361504601120462,
+        13.14739366071961
+      ],
+      "z_range": [
+        -3.159992282359537,
+        -0.39335438258275096
+      ],
+      "bounding_box": {
+        "width": 3.6149696611816253,
+        "height": 11.811243200607564,
+        "depth": 2.766637899776786
+      }
+    },
+    "raw_file": {
+      "is_point_cloud": false,
+      "description": "Shape: (), 可能不是點雲數據"
+    },
+    "image_file": {
+      "is_point_cloud": false,
+      "description": "Shape: (), 可能不是點雲數據"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: etc-pointcloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh"]
+        args: ["-c", "echo '<!DOCTYPE html><html><head><title>ETC Point Cloud</title></head><body><h1>ETC Point Cloud Annotation System</h1><p>系統正在運行中！</p><p>後端 API: <a href=\"http://34.81.9.183:8000/docs\">http://34.81.9.183:8000/docs</a></p></body></html>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: etc-pointcloud
+spec:
+  selector:
+    app: frontend
+  ports:
+  - port: 80
+    targetPort: 80
+  type: LoadBalancer

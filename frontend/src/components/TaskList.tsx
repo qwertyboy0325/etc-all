@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Table,
   Tag,
@@ -7,15 +7,22 @@ import {
   Button,
   Tooltip,
   Progress,
-  Typography
+  Typography,
+  Modal,
+  Card,
+  Spin
 } from 'antd';
 import {
   EditOutlined,
   EyeOutlined,
   UserOutlined,
   ClockCircleOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  EyeInvisibleOutlined
 } from '@ant-design/icons';
+import PointCloudRenderer, { PointCloudRendererRef } from './PointCloudRenderer';
+import { parseNpyFile, calculateBounds } from '../utils/npyParser';
+import { extractPointCloudFromNpzBuffer } from '../utils/npzParser';
 import type { ColumnsType } from 'antd/es/table';
 import { 
   Task, TaskStatus, TaskPriority,
@@ -32,14 +39,55 @@ interface TaskListProps {
   onView?: (task: Task) => void;
   onAssign?: (taskId: string, assigneeId: string) => void;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
+  onDelete?: (taskId: string) => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
   tasks,
   loading = false,
   onView,
-  onEdit
+  onEdit,
+  onDelete
 }) => {
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const rendererRef = useRef<PointCloudRendererRef>(null);
+
+  // 預覽點雲文件
+  const handlePreviewPointCloud = async (task: Task) => {
+    if (!task.pointcloud_file_id) return;
+    
+    try {
+      setPreviewLoading(true);
+      setPreviewVisible(true);
+      
+      // 下載文件
+      const response = await fetch(`/api/v1/files/${task.pointcloud_file_id}/download`);
+      if (!response.ok) throw new Error('Failed to download file');
+      const arrayBuffer = await response.arrayBuffer();
+
+      // 解析文件
+      let pointCloudData;
+      if (task.pointcloud_file?.original_filename?.endsWith('.npz')) {
+        pointCloudData = await extractPointCloudFromNpzBuffer(arrayBuffer);
+      } else {
+        const npyData = parseNpyFile(arrayBuffer);
+        pointCloudData = {
+          positions: npyData.data,
+          pointCount: npyData.shape[0],
+          bounds: calculateBounds(npyData.data)
+        };
+      }
+
+      setPreviewData(pointCloudData);
+    } catch (error) {
+      console.error('Failed to preview point cloud:', error);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const columns: ColumnsType<Task> = [
     {
       title: '任務名稱',
@@ -217,6 +265,16 @@ const TaskList: React.FC<TaskListProps> = ({
               onClick={() => onView?.(record)}
             />
           </Tooltip>
+          {record.pointcloud_file_id && (
+            <Tooltip title="預覽點雲">
+              <Button
+                type="text"
+                size="small"
+                icon={<EyeInvisibleOutlined />}
+                onClick={() => handlePreviewPointCloud(record)}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="編輯任務">
             <Button
               type="text"
@@ -225,37 +283,99 @@ const TaskList: React.FC<TaskListProps> = ({
               onClick={() => onEdit?.(record)}
             />
           </Tooltip>
+          {onDelete && (
+            <Tooltip title="刪除任務">
+              <Button
+                type="text"
+                size="small"
+                danger
+                onClick={() => onDelete(record.id)}
+              >
+                刪除
+              </Button>
+            </Tooltip>
+          )}
         </Space>
       ),
     },
   ];
 
   return (
-    <Table
-      columns={columns}
-      dataSource={tasks}
-      loading={loading}
-      rowKey="id"
-      size="small"
-      scroll={{ x: 1200 }}
-      pagination={{
-        pageSize: 20,
-        showSizeChanger: true,
-        showQuickJumper: true,
-        showTotal: (total, range) => 
-          `第 ${range[0]}-${range[1]} 項，共 ${total} 項任務`,
-        pageSizeOptions: ['10', '20', '50', '100']
-      }}
-      rowClassName={(record) => {
-        if (record.is_overdue && !record.is_completed) {
-          return 'task-row-overdue';
-        }
-        if (record.status === TaskStatus.COMPLETED) {
-          return 'task-row-completed';
-        }
-        return '';
-      }}
-    />
+    <>
+      <Table
+        columns={columns}
+        dataSource={tasks}
+        loading={loading}
+        rowKey="id"
+        size="small"
+        scroll={{ x: 1200 }}
+        pagination={{
+          pageSize: 20,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          showTotal: (total, range) => 
+            `第 ${range[0]}-${range[1]} 項，共 ${total} 項任務`,
+          pageSizeOptions: ['10', '20', '50', '100']
+        }}
+        rowClassName={(record) => {
+          if (record.is_overdue && !record.is_completed) {
+            return 'task-row-overdue';
+          }
+          if (record.status === TaskStatus.COMPLETED) {
+            return 'task-row-completed';
+          }
+          return '';
+        }}
+      />
+      {/* 點雲預覽 Modal */}
+      <Modal
+        title="點雲預覽"
+        open={previewVisible}
+        onCancel={() => {
+          setPreviewVisible(false);
+          setPreviewData(null);
+        }}
+        footer={null}
+        width="80%"
+        style={{ top: 20 }}
+      >
+        <Card 
+          style={{ height: '70vh' }}
+          bodyStyle={{ padding: 0, height: '100%' }}
+        >
+          {previewLoading ? (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              height: '100%' 
+            }}>
+              <Spin size="large" />
+            </div>
+          ) : previewData ? (
+            <div style={{ height: '100%', width: '100%' }}>
+              <PointCloudRenderer
+                ref={rendererRef}
+                data={previewData}
+                pointSize={2}
+                pointColor="#00ff00"
+                backgroundColor="#000000"
+              />
+            </div>
+          ) : (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              height: '100%',
+              color: '#999'
+            }}>
+              無預覽數據
+            </div>
+          )}
+        </Card>
+      </Modal>
+    </>
   );
 };
 

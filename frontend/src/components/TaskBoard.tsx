@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Card, Tag, Avatar, Tooltip, Space, Typography, Badge } from 'antd';
+import { Card, Tag, Avatar, Tooltip, Space, Typography, Badge, Button, Modal, Select, message } from 'antd';
 import { Clock, User, AlertTriangle } from 'lucide-react';
 import { 
   Task, TaskStatus, TaskBoardColumn,
@@ -13,14 +13,17 @@ interface TaskBoardProps {
   onAssign?: (taskId: string, assigneeId: string) => void;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
   projectId: string;
+  onDelete?: (taskId: string) => void;
 }
 
 interface TaskCardProps {
   task: Task;
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
+  onDelete?: (taskId: string) => void;
+  onAssignClick?: (taskId: string) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete, onAssignClick }) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('zh-TW');
@@ -129,13 +132,59 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
           </div>
         </div>
       )}
+
+      {/* Actions */}
+      {(onAssignClick || onDelete) && (
+        <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          {onAssignClick && (
+            <Tooltip title="指派給成員">
+              <Button type="text" size="small" onClick={() => onAssignClick(task.id)}>
+                指派
+              </Button>
+            </Tooltip>
+          )}
+          {onDelete && (
+            <Tooltip title="刪除任務">
+              <Button type="text" size="small" danger onClick={() => onDelete(task.id)}>
+                刪除
+              </Button>
+            </Tooltip>
+          )}
+        </div>
+      )}
     </Card>
   );
 };
 
 const TaskBoard: React.FC<TaskBoardProps> = ({ 
-  tasks
+  tasks,
+  onDelete,
+  onAssign,
+  projectId
 }) => {
+  const [assignModal, setAssignModal] = React.useState<{ open: boolean; taskId?: string }>({ open: false });
+  const [members, setMembers] = React.useState<{ label: string; value: string }[]>([]);
+  const [assigneeId, setAssigneeId] = React.useState<string | undefined>();
+
+  const openAssign = async (taskId: string) => {
+    setAssignModal({ open: true, taskId });
+    setAssigneeId(undefined);
+    try {
+      const res = await fetch(`/api/v1/projects/${projectId}/members`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+      if (!res.ok) throw new Error('成員載入失敗');
+      const data = await res.json();
+      const opts = (data?.items || []).map((m: any) => ({ label: m.user?.full_name || m.user?.email, value: m.user_id }));
+      setMembers(opts);
+    } catch (e: any) {
+      message.error(e?.message || '載入專案成員失敗');
+    }
+  };
+
+  const doAssign = async () => {
+    if (!onAssign || !assignModal.taskId || !assigneeId) return;
+    await onAssign(assignModal.taskId, assigneeId);
+    setAssignModal({ open: false });
+  };
   // Group tasks by status
   const columns: TaskBoardColumn[] = useMemo(() => {
     const groupedTasks = tasks.reduce((acc, task) => {
@@ -187,9 +236,10 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
   return (
     <div style={{ 
       display: 'grid', 
-      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
       gap: '16px',
-      minHeight: '600px'
+      minHeight: '600px',
+      paddingBottom: '24px'
     }}>
       {columns.map((column) => (
         <Card
@@ -237,6 +287,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
                 <TaskCard
                   key={task.id}
                   task={task}
+                  onDelete={onDelete}
+                  onAssignClick={onAssign ? openAssign : undefined}
                 />
               ))
             )}
@@ -273,6 +325,24 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
           ))}
         </div>
       </Card>
+
+      <Modal
+        title="指派任務"
+        open={assignModal.open}
+        onCancel={() => setAssignModal({ open: false })}
+        onOk={doAssign}
+        okText="指派"
+      >
+        <Select
+          placeholder="選擇成員"
+          style={{ width: '100%' }}
+          options={members}
+          value={assigneeId}
+          onChange={setAssigneeId as any}
+          showSearch
+          optionFilterProp="label"
+        />
+      </Modal>
     </div>
   );
 };

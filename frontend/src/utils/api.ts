@@ -1,7 +1,7 @@
 // API configuration and utilities
 import { apiConfig } from '../config/api';
 
-export const API_BASE_URL = 'http://localhost:8000/api/v1';
+export const API_BASE_URL = apiConfig.getConfig().baseUrl;
 
 // Auth token helpers
 export const getAuthHeaders = () => {

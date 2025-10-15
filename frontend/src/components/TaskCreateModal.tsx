@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Modal,
   Form,
@@ -11,14 +11,20 @@ import {
   Row,
   Col,
   Divider,
-  Typography
+  Typography,
+  Card
 } from 'antd';
 import {
   PlusOutlined,
   UploadOutlined,
-  FileTextOutlined
+  FileTextOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import type { FileInfo } from '../services/fileService';
+import PointCloudRenderer, { PointCloudRendererRef } from './PointCloudRenderer';
+import { parseNpyFile, calculateBounds } from '../utils/npyParser';
+import { extractPointCloudFromNpzBuffer } from '../utils/npzParser';
+import { API_BASE_URL, getAuthHeaders } from '../utils/api';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -32,6 +38,7 @@ interface TaskCreateModalProps {
   loading?: boolean;
   projectId: string;
   availableFiles: FileInfo[];
+  onRefreshFiles?: () => Promise<void>;
 }
 
 export interface TaskFormData {
@@ -50,16 +57,97 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
   onCancel,
   onSubmit,
   loading = false,
-  availableFiles
+  availableFiles,
+  projectId,
+  onRefreshFiles
 }) => {
   const [form] = Form.useForm();
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const rendererRef = useRef<PointCloudRendererRef>(null);
 
   // Reset form when modal closes
   useEffect(() => {
     if (!visible) {
       form.resetFields();
+      setPreviewData(null);
     }
   }, [visible, form]);
+
+  // 預覽點雲文件
+  const handlePreviewFile = async (fileId: string) => {
+    try {
+      setPreviewLoading(true);
+      const file = availableFiles.find(f => f.id === fileId);
+      if (!file) return;
+
+      // 下載文件：優先專案簽名URL，其次本地開發端點
+      let arrayBuffer: ArrayBuffer | null = null;
+      if (projectId) {
+        const signed = await fetch(`${API_BASE_URL}/projects/${projectId}/files/${fileId}/download`, { headers: getAuthHeaders() });
+        if (signed.ok) {
+          const meta = await signed.json();
+          const binResp = await fetch(meta.download_url, { headers: getAuthHeaders() });
+          if (!binResp.ok) throw new Error('Failed to fetch signed URL');
+          arrayBuffer = await binResp.arrayBuffer();
+        }
+      }
+      if (!arrayBuffer) {
+        const fallback = await fetch(`${API_BASE_URL}/files/${fileId}/download`, { headers: getAuthHeaders() });
+        if (!fallback.ok) throw new Error('Failed to download file');
+        arrayBuffer = await fallback.arrayBuffer();
+      }
+
+      // 解析文件
+      let pointCloudData;
+      const filename = (file.original_filename || file.filename || '').toLowerCase();
+      if (filename.endsWith('.npz')) {
+        pointCloudData = await extractPointCloudFromNpzBuffer(arrayBuffer);
+      } else {
+        const npyData = parseNpyFile(arrayBuffer);
+        pointCloudData = {
+          positions: npyData.data,
+          pointCount: npyData.shape[0],
+          bounds: calculateBounds(npyData.data)
+        };
+      }
+
+      setPreviewData(pointCloudData);
+    } catch (error) {
+      console.error('Failed to preview file:', error);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleInlineUpload = async (file: File) => {
+    if (!projectId) {
+      return message.error('缺少專案ID，無法上傳');
+    }
+    try {
+      setUploading(true);
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('file', file);
+      const resp = await fetch(`${API_BASE_URL}/projects/${projectId}/files/upload`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+        body: formData
+      });
+      if (!resp.ok) throw new Error(`Upload failed: HTTP ${resp.status}`);
+      const data = await resp.json();
+      const newFileId = data.file_id;
+      message.success('上傳成功，已加入檔案清單');
+      if (onRefreshFiles) await onRefreshFiles();
+      form.setFieldsValue({ pointcloudFileId: newFileId });
+      await handlePreviewFile(newFileId);
+    } catch (e: any) {
+      message.error(e?.message || '上傳失敗');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   // Handle form submission
   const handleSubmit = async (values: any) => {
@@ -93,8 +181,14 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
       open={visible}
       onCancel={onCancel}
       footer={null}
-      width={800}
+      width={840}
       destroyOnHidden
+      centered
+      zIndex={1200}
+      style={{ maxWidth: 'calc(100vw - 48px)' }}
+      styles={{
+        body: { maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }
+      }}
     >
       <Form
         form={form}
@@ -178,7 +272,14 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
               name="pointcloudFileId"
               rules={[{ required: true, message: '請選擇點雲文件' }]}
             >
-              <Select placeholder="選擇已上傳的點雲文件">
+              <Select 
+                placeholder="選擇已上傳的點雲文件"
+                onChange={(value) => {
+                  if (value) {
+                    handlePreviewFile(value);
+                  }
+                }}
+              >
                 {availableFiles.map(f => (
                   <Option key={f.id} value={f.id}>
                     <Space>
@@ -188,6 +289,40 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
                   </Option>
                 ))}
               </Select>
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label=" ">
+              <Button 
+                icon={<EyeOutlined />}
+                onClick={() => {
+                  const fileId = form.getFieldValue('pointcloudFileId');
+                  if (fileId) {
+                    handlePreviewFile(fileId);
+                  }
+                }}
+                disabled={!form.getFieldValue('pointcloudFileId')}
+                loading={previewLoading}
+              >
+                預覽點雲
+              </Button>
+              <Button 
+                style={{ marginLeft: 8 }}
+                icon={<UploadOutlined />}
+                loading={uploading}
+                onClick={async () => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.npy,.npz,.ply,.pcd';
+                  input.onchange = async (e: any) => {
+                    const file = e.target.files?.[0];
+                    if (file) await handleInlineUpload(file);
+                  };
+                  input.click();
+                }}
+              >
+                上傳並選用
+              </Button>
             </Form.Item>
           </Col>
           <Col span={6}>
@@ -236,6 +371,35 @@ const TaskCreateModal: React.FC<TaskCreateModalProps> = ({
             tokenSeparators={[',']}
           />
         </Form.Item>
+
+        {/* 點雲預覽 */}
+        {previewData && (
+          <Form.Item label="點雲預覽">
+            <Card 
+              title="點雲文件預覽" 
+              size="small"
+              style={{ height: '400px' }}
+              extra={
+                <Button 
+                  size="small" 
+                  onClick={() => setPreviewData(null)}
+                >
+                  關閉預覽
+                </Button>
+              }
+            >
+              <div style={{ height: '350px', width: '100%' }}>
+                <PointCloudRenderer
+                  ref={rendererRef}
+                  data={previewData}
+                  pointSize={2}
+                  pointColor="#00ff00"
+                  backgroundColor="#000000"
+                />
+              </div>
+            </Card>
+          </Form.Item>
+        )}
 
         {/* Footer */}
         <Form.Item style={{ marginBottom: 0, textAlign: 'right', marginTop: '24px' }}>

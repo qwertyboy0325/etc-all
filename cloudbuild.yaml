@@ -1,0 +1,70 @@
+# Cloud Build configuration for ETC Point Cloud Annotation System
+steps:
+  # Build backend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/etc-backend:$COMMIT_SHA', './backend']
+    dir: '.'
+
+  # Build frontend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/etc-frontend:$COMMIT_SHA', './frontend']
+    dir: '.'
+
+  # Push backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/etc-backend:$COMMIT_SHA']
+
+  # Push frontend image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/etc-frontend:$COMMIT_SHA']
+
+  # Tag backend image as latest
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['tag', 'gcr.io/$PROJECT_ID/etc-backend:$COMMIT_SHA', 'gcr.io/$PROJECT_ID/etc-backend:latest']
+
+  # Tag frontend image as latest
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['tag', 'gcr.io/$PROJECT_ID/etc-frontend:$COMMIT_SHA', 'gcr.io/$PROJECT_ID/etc-frontend:latest']
+
+  # Push latest tags
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/etc-backend:latest']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/etc-frontend:latest']
+
+  # Deploy to Kubernetes
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    args:
+      - 'run'
+      - '--filename=k8s/namespace.yaml'
+      - '--filename=k8s/configmap.yaml'
+      - '--filename=k8s/secrets.yaml'
+      - '--filename=k8s/postgres.yaml'
+      - '--filename=k8s/redis.yaml'
+      - '--filename=k8s/minio.yaml'
+      - '--filename=k8s/backend.yaml'
+      - '--filename=k8s/frontend.yaml'
+      - '--filename=k8s/ingress.yaml'
+      - '--cluster=etc-pointcloud-cluster'
+      - '--location=asia-east1-a'
+      - '--namespace=etc-pointcloud'
+
+# Build options
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+  logging: CLOUD_LOGGING_ONLY
+
+# Build timeout
+timeout: '1200s'
+
+# Images to be pushed to registry
+images:
+  - 'gcr.io/$PROJECT_ID/etc-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/etc-frontend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/etc-backend:latest'
+  - 'gcr.io/$PROJECT_ID/etc-frontend:latest'
+
+
+

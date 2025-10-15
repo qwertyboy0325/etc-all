@@ -2,6 +2,7 @@
  * 文件服務
  * 用於從API獲取文件列表和載入文件
  */
+import { API_BASE_URL, getAuthHeaders } from '../utils/api';
 
 export interface FileInfo {
   id: string;
@@ -17,28 +18,41 @@ export interface FileListResponse {
   total: number;
 }
 
+export interface FileUploadResponse {
+  file_id: string;
+  filename: string;
+  original_filename: string;
+  file_size: number;
+  status: string;
+  point_count?: number;
+  checksum?: string;
+  message?: string;
+}
+
 /**
  * 從API獲取文件列表
  */
 export async function getFileList(): Promise<FileInfo[]> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch('http://localhost:8000/api/v1/files', {
+    const response = await fetch(`${API_BASE_URL}/files`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        ...getAuthHeaders(),
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (response.status === 401) {
+        console.error('Authentication required. Please login first.');
+        throw new Error('請先登入以查看文件列表');
+      }
+      const errorText = await response.text();
+      console.error(`API Error ${response.status}:`, errorText);
+      throw new Error(`載入文件列表失敗: HTTP ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('File list loaded:', data);
     return Array.isArray(data) ? data : data.items || [];
   } catch (error) {
     console.error('Failed to fetch file list:', error);
@@ -51,18 +65,12 @@ export async function getFileList(): Promise<FileInfo[]> {
  */
 export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch(`http://localhost:8000/api/v1/files/${fileId}/download`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+    const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
+      headers: getAuthHeaders()
     });
 
     if (!response.ok) {
+      if (response.status === 401) throw new Error('Unauthorized');
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -78,23 +86,19 @@ export async function downloadFile(fileId: string): Promise<ArrayBuffer> {
  */
 export async function uploadFile(file: File): Promise<FileInfo> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('http://localhost:8000/api/v1/files/upload', {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/files/upload`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
+      // Important: Do NOT set Content-Type here; let browser set multipart boundary
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
       body: formData
     });
 
     if (!response.ok) {
+      if (response.status === 401) throw new Error('Unauthorized');
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -106,23 +110,68 @@ export async function uploadFile(file: File): Promise<FileInfo> {
 }
 
 /**
+ * 專案：上傳單一點雲文件（.npy/.npz/.ply/.pcd）
+ */
+export async function uploadProjectFile(projectId: string, file: File, description?: string): Promise<FileUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (description) formData.append('description', description);
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL}/projects/${projectId}/files/upload`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    body: formData
+  });
+  if (!res.ok) throw new Error(`Upload failed: HTTP ${res.status}`);
+  return await res.json();
+}
+
+/**
+ * 專案：批量上傳點雲文件（多檔）
+ */
+export async function uploadProjectFiles(projectId: string, files: File[]): Promise<FileUploadResponse[]> {
+  const formData = new FormData();
+  files.forEach(f => formData.append('files', f));
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL}/projects/${projectId}/files/upload-multi`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    body: formData
+  });
+  if (!res.ok) throw new Error(`Upload multi failed: HTTP ${res.status}`);
+  return await res.json();
+}
+
+/**
+ * 專案：上傳ZIP（包含多個 npy/npz）
+ */
+export async function uploadProjectArchive(projectId: string, zipFile: File): Promise<FileUploadResponse[]> {
+  const formData = new FormData();
+  formData.append('archive', zipFile);
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE_URL}/projects/${projectId}/files/upload-archive`, {
+    method: 'POST',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    body: formData
+  });
+  if (!res.ok) throw new Error(`Upload archive failed: HTTP ${res.status}`);
+  return await res.json();
+}
+
+/**
  * 生成示例文件
  */
 export async function generateSampleFiles(): Promise<{ message: string; files: string[] }> {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const response = await fetch('http://localhost:8000/api/v1/system/generate-sample-npy', {
+    const response = await fetch(`${API_BASE_URL}/system/generate-sample-npy`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        ...getAuthHeaders(),
         'Content-Type': 'application/json'
       }
     });
 
     if (!response.ok) {
+      if (response.status === 401) throw new Error('Unauthorized');
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 

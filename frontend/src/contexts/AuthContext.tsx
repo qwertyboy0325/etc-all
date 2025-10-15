@@ -43,24 +43,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // Check if user is authenticated
-  const checkAuth = () => {
+  const checkAuth = async () => {
     setIsLoading(true);
     try {
       const storedToken = localStorage.getItem('token');
       const storedUser = localStorage.getItem('user');
 
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+      // 若無任何憑證，確保狀態為未登入
+      if (!storedToken || !storedUser) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setToken(null);
+        setUser(null);
+        return;
       }
+
+      // 先套用暫存以避免閃爍，但立即向後端驗證
+      setToken(storedToken);
+      setUser(normalizeUser(JSON.parse(storedUser)));
+
+      // 向後端驗證 token，失敗則清除並標記為未登入
+      const baseUrl = apiConfig.getConfig().baseUrl;
+      const resp = await fetch(`${baseUrl}/auth/verify-token`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${storedToken}` }
+      });
+
+      if (!resp.ok) {
+        throw new Error('Token invalid');
+      }
+
+      // 可選：同步最新使用者資料
+      // const me = await fetch(`${baseUrl}/auth/me`, { headers: { 'Authorization': `Bearer ${storedToken}` }});
+      // if (me.ok) setUser(normalizeUser(await me.json()));
+
     } catch (error) {
-      console.error('Auth check error:', error);
-      // Clear invalid data
+      console.warn('Auth verification failed, clearing credentials');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      setToken(null);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Normalize backend user payload to frontend shape
+  const normalizeUser = (raw: any): User => {
+    if (!raw) return raw;
+    return {
+      id: raw.id,
+      email: raw.email,
+      fullName: raw.fullName || raw.full_name || raw.username || raw.email,
+      globalRole: (raw.globalRole || raw.global_role || '').toString().toLowerCase() as any,
+      isActive: raw.isActive ?? raw.is_active,
+      createdAt: raw.createdAt || raw.created_at
+    } as User;
   };
 
   // Removed mock token helper – always use real API
@@ -69,7 +107,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('🔐 嘗試登入:', email);
-      const response = await fetch(`${apiConfig.getConfig().baseUrl}/auth/login`, {
+      const baseUrl = apiConfig.getConfig().baseUrl;
+      const response = await fetch(`${baseUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -85,10 +124,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const data = await response.json();
       console.log('✅ 真實API登入成功:', data);
 
+      const mappedUser = normalizeUser(data.user);
       localStorage.setItem('token', data.access_token || data.accessToken);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('user', JSON.stringify(mappedUser));
       setToken(data.access_token || data.accessToken);
-      setUser(data.user);
+      setUser(mappedUser);
       return true;
     } catch (error: any) {
       console.error('Login error:', error);
@@ -100,7 +140,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Register function (real API only)
   const register = async (email: string, password: string, fullName: string): Promise<boolean> => {
     try {
-      const response = await fetch(`${apiConfig.getConfig().baseUrl}/auth/register`, {
+      const baseUrl = apiConfig.getConfig().baseUrl;
+      const response = await fetch(`${baseUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, full_name: fullName })
@@ -182,12 +223,17 @@ export const useUser = () => {
 
 export const usePermissions = () => {
   const { user } = useAuth();
-  
+  const role = (user?.globalRole || '').toString();
+  const roleLower = role.toLowerCase();
+
+  const isAdmin = roleLower === 'admin' || role === 'ADMIN';
+  const isSystemAdmin = roleLower === 'system_admin' || role === 'SYSTEM_ADMIN';
+
   return {
-    isAdmin: user?.globalRole === 'admin',
-    isSystemAdmin: user?.globalRole === 'system_admin',
-    canCreateProjects: user?.globalRole === 'admin' || user?.globalRole === 'system_admin',
-    canManageUsers: user?.globalRole === 'system_admin',
+    isAdmin,
+    isSystemAdmin,
+    canCreateProjects: isAdmin || isSystemAdmin,
+    canManageUsers: isSystemAdmin,
     canAccessSystem: user?.isActive ?? false,
   };
 };
