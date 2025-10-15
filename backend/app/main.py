@@ -10,10 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 
 from app.api.v1 import api_router
 from app.core.config import settings
-from app.core.database import close_db, init_db
+from app.core.database import close_db, init_db, AsyncSessionLocal
 from app.core.exceptions import (
     BaseCustomException,
     custom_exception_handler,
@@ -22,6 +23,9 @@ from app.core.exceptions import (
     http_exception_override_handler,
     validation_exception_handler,
 )
+from app.core.security import get_password_hash
+from app.models.user import User
+from app.models.enums import GlobalRole
 
 # Configure logging
 logging.basicConfig(
@@ -47,8 +51,44 @@ async def lifespan(app: FastAPI):
         await init_db()
         logger.info("Database initialized successfully")
 
-        # Add any other startup tasks here
-        # e.g., initialize Redis, MinIO, etc.
+        # Bootstrap first superuser if enabled
+        if settings.SEED_ADMIN:
+            try:
+                async with AsyncSessionLocal() as session:
+                    result = await session.execute(
+                        select(User).where(User.email == settings.FIRST_SUPERUSER_EMAIL)
+                    )
+                    admin_user = result.scalar_one_or_none()
+
+                    if not admin_user:
+                        admin = User(
+                            email=settings.FIRST_SUPERUSER_EMAIL,
+                            full_name=settings.FIRST_SUPERUSER_NAME,
+                            username=None,
+                            hashed_password=get_password_hash(
+                                settings.FIRST_SUPERUSER_PASSWORD
+                            ),
+                            is_active=True,
+                            is_verified=True,
+                            global_role=GlobalRole.SYSTEM_ADMIN,
+                        )
+                        session.add(admin)
+                        await session.commit()
+                        logger.info(
+                            "Seeded FIRST_SUPERUSER %s with system_admin role",
+                            settings.FIRST_SUPERUSER_EMAIL,
+                        )
+                    else:
+                        # Ensure role is system_admin (idempotent)
+                        if admin_user.global_role != GlobalRole.SYSTEM_ADMIN:
+                            admin_user.global_role = GlobalRole.SYSTEM_ADMIN
+                            await session.commit()
+                            logger.info(
+                                "Ensured %s has system_admin role",
+                                settings.FIRST_SUPERUSER_EMAIL,
+                            )
+            except Exception as e:
+                logger.error(f"Admin seeding failed: {e}")
 
         logger.info("Application startup complete")
 

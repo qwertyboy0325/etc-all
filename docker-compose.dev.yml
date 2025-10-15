@@ -77,6 +77,10 @@ services:
       - DB_USER=root
       - DB_PASSWORD=root
       - DATABASE_URL=postgresql+asyncpg://root:root@db:5432/etc_pointcloud_dev
+      - SEED_ADMIN=true
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@etc.com}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-admin123}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-Admin}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
@@ -121,6 +125,10 @@ services:
       - DB_NAME=etc_pointcloud_dev
       - DB_USER=root
       - DB_PASSWORD=root
+      - SEED_ADMIN=true
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@etc.com}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-admin123}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-Admin}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0

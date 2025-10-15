@@ -68,6 +68,10 @@ services:
       - DB_NAME=${POSTGRES_DB:-etc_pointcloud_prod}
       - DB_USER=${POSTGRES_USER:-root}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - SEED_ADMIN=true
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@etc.com}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-Admin}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0

@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Database bootstrap
+    AUTO_CREATE_TABLES: bool = True
+
+    # Admin seeding
+    SEED_ADMIN: bool = True
+    FIRST_SUPERUSER_EMAIL: str = "admin@etc.com"
+    FIRST_SUPERUSER_PASSWORD: str = "admin123"
+    FIRST_SUPERUSER_NAME: str = "Admin"
+
     # Database Configuration
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
