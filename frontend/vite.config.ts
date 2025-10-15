@@ -7,8 +7,8 @@ import { fileURLToPath, URL } from 'node:url'
 export default defineConfig({
   plugins: [react()],
   
-  // GitHub Pages configuration
-  base: process.env.NODE_ENV === 'production' ? '/ETC/' : '/',
+  // Base path for assets (serve at root in production)
+  base: '/',
   
   // Build configuration
   build: {
