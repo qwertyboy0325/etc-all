@@ -80,7 +80,7 @@ services:
       - DEBUG=False
       - ENVIRONMENT=production
       - SECRET_KEY=${SECRET_KEY}
-      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS:-http://localhost:3000}
+      - BACKEND_CORS_ORIGINS=["http://localhost"]
     networks:
       - app_network
     depends_on:
