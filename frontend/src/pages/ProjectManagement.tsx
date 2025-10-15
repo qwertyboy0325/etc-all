@@ -260,16 +260,12 @@ const ProjectManagement: React.FC = () => {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 120,
-      render: (date: string) => {
-        if (!date) return '-';
-        try {
-          const dateObj = new Date(date);
-          if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleDateString('zh-TW');
-        } catch (error) {
-          console.warn('Invalid date format:', date);
-          return '-';
-        }
+      render: (_: any, record: Project) => {
+        const anyRecord = record as any;
+        const ts = anyRecord.createdAt || anyRecord.created_at || anyRecord.created || anyRecord.createdDate;
+        if (!ts) return '-';
+        const d = new Date(ts);
+        return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('zh-TW');
       }
     },
     {
