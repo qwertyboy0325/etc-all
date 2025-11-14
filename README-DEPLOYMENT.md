@@ -2,6 +2,87 @@
 
 This guide will help you deploy the ETC Point Cloud Annotation System to Google Cloud Platform (GCP) using Kubernetes.
 
+## ⚡ Local Quickstart (Docker Compose)
+
+If you want to run locally or on a single VM using Docker Compose, follow this section.
+
+### Prerequisites
+
+- Docker 24+ and Docker Compose v2
+- 4 CPU / 6 GB RAM recommended
+
+### Development (hot-reload, port 80 available via dev Nginx)
+
+1) Start the stack
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+2) Wait for containers to be healthy
+
+```bash
+docker ps
+# etc_api_dev, etc_postgres_dev, etc_redis_dev, etc_minio_dev should be healthy
+```
+
+3) Access
+- Frontend (Vite dev server): http://localhost:3000
+- Dev Nginx (optional reverse proxy): http://localhost
+- API (direct): http://localhost:8000
+  - Health: http://localhost:8000/health
+  - API docs (if enabled): http://localhost:8000/api/v1/docs
+
+4) Admin account
+- Auto-seeded on first start
+- Email: admin@etc.com
+- Password: admin123
+
+5) Reset the dev database
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+### Production-like (single host, Nginx on port 80)
+
+1) Required environment variables (must be provided on first run)
+
+```bash
+export FIRST_SUPERUSER_PASSWORD=admin123   # initial admin password (customize in real prod)
+export POSTGRES_PASSWORD=root             # Postgres root password (compose default user is 'root')
+export MINIO_SECRET_KEY=minioadmin        # MinIO root password (user defaults to 'minioadmin')
+export SECRET_KEY=change-me               # FastAPI app secret key (JWT/signing)
+```
+
+2) Start the stack
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+3) Access
+- Frontend: http://localhost
+- API (via Nginx): http://localhost/api/v1
+- Health: http://localhost/health
+
+4) Admin account
+- Auto-seeded on first start with:
+  - Email: admin@etc.com
+  - Password: $FIRST_SUPERUSER_PASSWORD
+- Role is enforced to `system_admin` on startup if user already exists.
+
+5) Notes and tips
+- In production, `.env` is intentionally ignored by the app; environment variables from the runtime are authoritative.
+- If you need to reset everything, including data:
+  ```bash
+  docker compose -f docker-compose.prod.yml down -v
+  docker compose -f docker-compose.prod.yml up -d --build
+  ```
+- Frontend is built with Vite and served by Nginx; assets are at `/`, API is reverse-proxied at `/api/`.
+- Default CORS is set to allow `http://localhost`. For a real domain, set `BACKEND_CORS_ORIGINS=["https://your-domain.com"]` on the API service.
+
 ## 🏗️ Architecture Overview
 
 The system consists of:
