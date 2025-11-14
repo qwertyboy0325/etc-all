@@ -9,6 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
+from app.models.base import Base as ModelsBase
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -113,8 +114,9 @@ async def init_db() -> None:
         async with async_engine.begin() as conn:
             logger.info("Database connection established successfully")
 
-            # In development, you might want to create tables here
-            # await conn.run_sync(Base.metadata.create_all)
+            # Optionally auto-create tables (development/bootstrap)
+            if settings.AUTO_CREATE_TABLES:
+                await conn.run_sync(ModelsBase.metadata.create_all)
 
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
