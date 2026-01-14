@@ -168,6 +168,9 @@ PointNet/log/
 backend/uploads/
 backend/exports/
 
+# Docker data volumes
+data/
+
 # PointNet specific
 PointNet/__pycache__/
 PointNet/data/
