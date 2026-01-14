@@ -66,7 +66,9 @@ services:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - SEED_ADMIN=true
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
@@ -74,17 +76,21 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - MINIO_HOST=minio
       - MINIO_PORT=9000
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_SECURE=false
+      - MINIO_URL=http://minio:9000
       - DEBUG=False
       - ENVIRONMENT=production
       - SECRET_KEY=${SECRET_KEY}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
-      - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH}
+      - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH:-/data/datasets}
     volumes:
       - "./training-data:/data/datasets"
     networks:
@@ -109,30 +115,37 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: etc_celery_worker_prod
-    command: celery -A app.celery_app worker --loglevel=info
+    command: python -m celery -A app.celery_app worker --loglevel=info
     environment:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=${POSTGRES_DB}
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - MINIO_HOST=minio
       - MINIO_PORT=9000
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
       - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_SECURE=false
+      - MINIO_URL=http://minio:9000
       - DEBUG=False
       - ENVIRONMENT=production
       - SECRET_KEY=${SECRET_KEY}
-      - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH}
-      # Explicitly set DATABASE_URL for worker/async context if needed by libs
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH:-/data/datasets}
+      - SEED_ADMIN=true
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME}
     volumes:
-      - "./training-data:/data/datasets"
+      - ./training-data:/data/datasets
     networks:
       - app_network
     depends_on:
@@ -140,6 +153,12 @@ services:
       - redis
       - minio
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -m celery -A app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # React Frontend
   frontend:
