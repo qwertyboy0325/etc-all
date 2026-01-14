@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   db:
@@ -92,7 +90,7 @@ services:
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
       - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH:-/data/datasets}
     volumes:
-      - "./training-data:/data/datasets"
+      - ./training-data:/data/datasets
     networks:
       - app_network
     depends_on:
