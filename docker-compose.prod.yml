@@ -113,8 +113,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: etc_celery_worker_prod
-    command: python -m celery -A app.celery_app worker --loglevel=info
+    command: celery -A app.celery_app worker --loglevel=info
+    working_dir: /app
     environment:
+      - PYTHONPATH=/app
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=${POSTGRES_DB}
