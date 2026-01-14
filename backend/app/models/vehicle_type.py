@@ -123,6 +123,11 @@ class ProjectVehicleType(BaseProjectModel):
         return f"<ProjectVehicleType(id={self.id}, project_id={self.project_id}, name='{self.name}')>"
 
     @property
+    def code(self) -> str:
+        """Alias for name to support schemas expecting 'code'."""
+        return self.name
+
+    @property
     def is_global(self) -> bool:
         """Check if this is based on a global vehicle type."""
         return (

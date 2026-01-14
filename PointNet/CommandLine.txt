@@ -1,0 +1,6 @@
+python SplitDataSet.py --ratio 0.1 --directory E:/DataSets/FETC_Point_Cloud_Data/data_augmentation_source/
+
+python dataaugmentation.py --source_dir E:/DataSets/FETC_Point_Cloud_Data/data_augmentation_source --destination_dir E:/DataSets/FETC_Point_Cloud_Data/data_augmentation_destination/NoiseStd0.05 --noise_std 0.05 --test_size 1000 --train_size 9000 
+
+python train_classification.py --data_dir E:/DataSets/FETC_Point_Cloud_Data/data_augmentation_destination/NoiseStd0.05/ --log_dir pointnet_cls_fetc_noise_std_0.05 --gpu 0 --epoch 200 --process_data --clear_log
+

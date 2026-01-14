@@ -1,6 +1,7 @@
 """Database configuration and connection management."""
 
 import logging
+import asyncio
 from typing import AsyncGenerator
 
 from sqlalchemy import MetaData, create_engine, text
@@ -109,18 +110,45 @@ def get_sync_session():
 
 async def init_db() -> None:
     """Initialize database connection and create tables if needed."""
+    max_attempts = 15
+    delay_seconds = 2
+
+    last_exc: Exception | None = None
+    # Log target DB (mask password)
     try:
-        # Test connection
-        async with async_engine.begin() as conn:
-            logger.info("Database connection established successfully")
+        from urllib.parse import urlparse
 
-            # Optionally auto-create tables (development/bootstrap)
-            if settings.AUTO_CREATE_TABLES:
-                await conn.run_sync(ModelsBase.metadata.create_all)
+        parsed = urlparse(settings.DATABASE_URL)
+        masked_netloc = parsed.netloc
+        if "@" in masked_netloc and ":" in masked_netloc.split("@")[0]:
+            user, rest = masked_netloc.split("@", 1)[0], masked_netloc.split("@", 1)[1]
+            user_name = user.split(":", 1)[0]
+            masked_netloc = f"{user_name}:***@{rest}"
+        logger.info(f"Attempting DB connection to: {parsed.scheme}://{masked_netloc}{parsed.path}")
+    except Exception:
+        pass
+    for attempt in range(1, max_attempts + 1):
+        try:
+            # Test connection
+            async with async_engine.begin() as conn:
+                logger.info("Database connection established successfully")
 
-    except Exception as e:
-        logger.error(f"Failed to connect to database: {e}")
-        raise
+                # Optionally auto-create tables (development/bootstrap)
+                if settings.AUTO_CREATE_TABLES:
+                    await conn.run_sync(ModelsBase.metadata.create_all)
+
+            # success -> return
+            return
+        except Exception as e:
+            last_exc = e
+            logger.error(f"Failed to connect to database: {e}")
+            if attempt < max_attempts:
+                await asyncio.sleep(delay_seconds)
+            else:
+                break
+
+    # If all attempts failed, raise last exception
+    raise last_exc if last_exc else RuntimeError("Unknown DB init error")
 
 
 async def close_db() -> None:

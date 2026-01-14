@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -91,8 +91,10 @@ services:
       - MINIO_SECURE=false
       - DEBUG=True
       - ENVIRONMENT=development
+      - DATASET_EXPORT_PATH=/data/datasets
     volumes:
       - ./backend:/app
+      - ./training-data:/data/datasets
       - /app/__pycache__
       - /app/.pytest_cache
     networks:
@@ -117,13 +119,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: etc_celery_worker_dev
-    command: celery -A app.celery_app worker --loglevel=info
+    command: python -m celery -A app.celery_app worker --loglevel=info
     environment:
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=etc_pointcloud_dev
       - DB_USER=root
       - DB_PASSWORD=root
+      - DATABASE_URL=postgresql+asyncpg://root:root@db:5432/etc_pointcloud_dev
       - SEED_ADMIN=true
       - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@etc.com}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD:-admin123}
@@ -131,16 +134,22 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
+      - REDIS_URL=redis://redis:6379/0
       - MINIO_HOST=minio
       - MINIO_PORT=9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=pointcloud-files
       - MINIO_SECURE=false
+      - MINIO_URL=http://minio:9000
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - DEBUG=True
       - ENVIRONMENT=development
+      - DATASET_EXPORT_PATH=/data/datasets
     volumes:
       - ./backend:/app
+      - ./training-data:/data/datasets
       - /app/__pycache__
     networks:
       - app_network
@@ -149,6 +158,12 @@ services:
       - redis
       - minio
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -m celery -A app.celery_app inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Celery Flower (Optional - for monitoring)
   celery_flower:
@@ -156,13 +171,19 @@ services:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: etc_celery_flower_dev
-    command: celery -A app.celery_app flower --port=5555
+    working_dir: /app
+    command: python -m celery -A app.celery_app flower --port=5555
     ports:
       - "5555:5555"
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
     networks:
       - app_network
     depends_on:

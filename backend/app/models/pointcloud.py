@@ -90,7 +90,9 @@ class PointCloudFile(BaseProjectModel):
     uploader = relationship("User", foreign_keys=[uploaded_by])
 
     tasks = relationship(
-        "Task", back_populates="pointcloud_file", cascade="all, delete-orphan"
+        "Task", 
+        secondary="task_files",
+        back_populates="files"
     )
 
     def __repr__(self) -> str:

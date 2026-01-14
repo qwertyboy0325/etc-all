@@ -56,20 +56,21 @@ const TaskList: React.FC<TaskListProps> = ({
 
   // 預覽點雲文件
   const handlePreviewPointCloud = async (task: Task) => {
-    if (!task.pointcloud_file_id) return;
+    if (!task.files || task.files.length === 0) return;
+    const file = task.files[0]; // Preview the first file
     
     try {
       setPreviewLoading(true);
       setPreviewVisible(true);
       
       // 下載文件
-      const response = await fetch(`/api/v1/files/${task.pointcloud_file_id}/download`);
+      const response = await fetch(`/api/v1/files/${file.id}/download`);
       if (!response.ok) throw new Error('Failed to download file');
       const arrayBuffer = await response.arrayBuffer();
 
       // 解析文件
       let pointCloudData;
-      if (task.pointcloud_file?.original_filename?.endsWith('.npz')) {
+      if (file.original_filename?.endsWith('.npz')) {
         pointCloudData = await extractPointCloudFromNpzBuffer(arrayBuffer);
       } else {
         const npyData = parseNpyFile(arrayBuffer);
@@ -217,21 +218,25 @@ const TaskList: React.FC<TaskListProps> = ({
     },
     {
       title: '文件',
-      dataIndex: 'pointcloud_file',
-      key: 'pointcloud_file',
+      dataIndex: 'files',
+      key: 'files',
       width: 150,
-      render: (file: any) => {
-        if (!file) return <Text type="secondary">無</Text>;
+      render: (files: any[]) => {
+        if (!files || files.length === 0) return <Text type="secondary">無</Text>;
+        
+        const firstFile = files[0];
+        const count = files.length;
         
         return (
-          <Tooltip title={`${file.original_filename} (${(file.file_size / 1024 / 1024).toFixed(1)} MB)`}>
+          <Tooltip title={files.map(f => f.original_filename).join(', ')}>
             <Space>
               <FileTextOutlined />
               <Text style={{ fontSize: '12px' }}>
-                {file.original_filename.length > 15 
-                  ? `${file.original_filename.substring(0, 15)}...`
-                  : file.original_filename
+                {firstFile.original_filename.length > 10 
+                  ? `${firstFile.original_filename.substring(0, 10)}...`
+                  : firstFile.original_filename
                 }
+                {count > 1 && <Tag style={{ marginLeft: 4 }}>+{count - 1}</Tag>}
               </Text>
             </Space>
           </Tooltip>
@@ -265,7 +270,7 @@ const TaskList: React.FC<TaskListProps> = ({
               onClick={() => onView?.(record)}
             />
           </Tooltip>
-          {record.pointcloud_file_id && (
+          {record.files && record.files.length > 0 && (
             <Tooltip title="預覽點雲">
               <Button
                 type="text"
@@ -341,7 +346,7 @@ const TaskList: React.FC<TaskListProps> = ({
       >
         <Card 
           style={{ height: '70vh' }}
-          bodyStyle={{ padding: 0, height: '100%' }}
+          styles={{ body: { padding: 0, height: '100%' } }}
         >
           {previewLoading ? (
             <div style={{ 

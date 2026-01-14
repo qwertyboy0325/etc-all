@@ -40,6 +40,7 @@ class AnnotationCreate(AnnotationBase):
     """Schema for creating a new annotation."""
 
     task_id: UUID = Field(..., description="Task ID for this annotation")
+    pointcloud_file_id: UUID = Field(..., description="Point cloud file ID for this annotation")
 
 
 class AnnotationUpdate(BaseModel):
@@ -105,8 +106,7 @@ class AnnotationReviewResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "extra": "ignore"}
 
 
 # Response schemas
@@ -114,11 +114,10 @@ class AnnotatorInfo(BaseModel):
     """Schema for annotator information."""
 
     id: UUID
-    full_name: str
+    full_name: Optional[str] = None
     email: str
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "extra": "ignore"}
 
 
 class TaskInfo(BaseModel):
@@ -126,10 +125,9 @@ class TaskInfo(BaseModel):
 
     id: UUID
     name: str
-    status: str
+    status: Any # Handle Enum or str
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "extra": "ignore"}
 
 
 class VehicleTypeInfo(BaseModel):
@@ -139,9 +137,32 @@ class VehicleTypeInfo(BaseModel):
     name: str
     code: str
     description: Optional[str]
+    display_name: str
+    color: Optional[str]
+    is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True, "extra": "ignore"}
+
+
+class VehicleTypeCreate(BaseModel):
+    """Schema for creating a new vehicle type."""
+
+    name: str = Field(..., min_length=1, max_length=100, description="Internal name/code")
+    display_name: str = Field(..., min_length=1, max_length=150, description="Display name")
+    description: Optional[str] = Field(None, description="Description")
+    category: Optional[str] = Field(None, description="Category (e.g., car, truck)")
+    color: Optional[str] = Field(None, pattern=r'^#[0-9a-fA-F]{6}$', description="UI color hex code")
+
+
+class VehicleTypeUpdate(BaseModel):
+    """Schema for updating a vehicle type."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    display_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    description: Optional[str] = None
+    category: Optional[str] = None
+    color: Optional[str] = Field(None, pattern=r'^#[0-9a-fA-F]{6}$')
+    is_active: Optional[bool] = None
 
 
 class AnnotationResponse(BaseModel):
@@ -149,12 +170,13 @@ class AnnotationResponse(BaseModel):
 
     id: UUID
     task_id: UUID
+    pointcloud_file_id: Optional[UUID] = None
     annotator_id: UUID
     vehicle_type_id: Optional[UUID]
     vehicle_type_name: Optional[str]
     confidence: Optional[float]
     notes: Optional[str]
-    status: AnnotationStatus
+    status: Any # AnnotationStatus
     started_at: datetime
     submitted_at: Optional[datetime]
     time_spent: Optional[int]
@@ -169,9 +191,9 @@ class AnnotationResponse(BaseModel):
     task: Optional[TaskInfo] = None
     vehicle_type: Optional[VehicleTypeInfo] = None
     reviews: Optional[List[AnnotationReviewResponse]] = []
-
-    class Config:
-        from_attributes = True
+    
+    # Allow extra fields in the response model to avoid validation errors
+    model_config = {"from_attributes": True, "extra": "ignore"}
 
 
 class AnnotationListResponse(BaseModel):

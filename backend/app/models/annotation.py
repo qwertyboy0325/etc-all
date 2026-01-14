@@ -32,6 +32,14 @@ class Annotation(BaseProjectModel):
         PostgresUUID(as_uuid=True), ForeignKey("tasks.id"), nullable=False, index=True
     )
 
+    # Point Cloud File (Specific file within the task)
+    pointcloud_file_id = Column(
+        PostgresUUID(as_uuid=True), 
+        ForeignKey("pointcloud_files.id"), 
+        nullable=False, 
+        index=True
+    )
+
     annotator_id = Column(
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
@@ -79,6 +87,8 @@ class Annotation(BaseProjectModel):
     )
 
     vehicle_type = relationship("ProjectVehicleType", back_populates="annotations")
+
+    pointcloud_file = relationship("PointCloudFile") # Added relationship
 
     reviews = relationship(
         "AnnotationReview", back_populates="annotation", cascade="all, delete-orphan"

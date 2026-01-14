@@ -1,29 +1,31 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Canvas, useThree, ThreeEvent } from '@react-three/fiber';
-import { OrbitControls, Line } from '@react-three/drei';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { Card, Button, Space, Tooltip, message, Typography } from 'antd';
+import { Card, Button, Space, Tooltip, Typography } from 'antd';
 import {
-  EyeOutlined,
-  SelectOutlined,
-  ClearOutlined,
   RotateLeftOutlined
 } from '@ant-design/icons';
 
 const { Text } = Typography;
 
+// Helper to create circular texture
+function createCircleTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const context = canvas.getContext('2d');
+  if (context) {
+    context.beginPath();
+    context.arc(16, 16, 14, 0, 2 * Math.PI);
+    context.fillStyle = 'white';
+    context.fill();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
 // Types
-interface Point3D {
-  x: number;
-  y: number;
-  z: number;
-}
-
-interface SelectedPoints {
-  indices: number[];
-  coordinates: Point3D[];
-}
-
 interface AnnotationData {
   id: string;
   vehicleType: string;
@@ -36,10 +38,6 @@ interface AnnotationData {
 interface AnnotationViewerProps {
   pointCloudData?: Float32Array;
   annotations?: AnnotationData[];
-  isSelectionMode?: boolean;
-  selectedPoints?: SelectedPoints;
-  onPointsSelect?: (points: SelectedPoints) => void;
-  onAnnotationClick?: (annotation: AnnotationData) => void;
   width?: number | string;
   height?: number | string;
   showStats?: boolean;
@@ -49,25 +47,17 @@ interface AnnotationViewerProps {
 interface PointCloudProps {
   data: Float32Array;
   annotations: AnnotationData[];
-  isSelectionMode: boolean;
-  selectedPoints: SelectedPoints;
-  onPointsSelect: (points: SelectedPoints) => void;
-  onAnnotationClick: (annotation: AnnotationData) => void;
+  pointSize: number;
 }
 
 const PointCloud: React.FC<PointCloudProps> = ({
   data,
   annotations,
-  isSelectionMode,
-  selectedPoints,
-  onPointsSelect,
-  onAnnotationClick: _onAnnotationClick
+  pointSize
 }) => {
   const meshRef = useRef<THREE.Points>(null);
   const [geometry, setGeometry] = useState<THREE.BufferGeometry>();
   const [material, setMaterial] = useState<THREE.PointsMaterial>();
-  const raycaster = useRef(new THREE.Raycaster());
-  const mouse = useRef(new THREE.Vector2());
   const { camera, gl } = useThree();
 
   // Initialize geometry and material
@@ -83,16 +73,20 @@ const PointCloud: React.FC<PointCloudProps> = ({
     // Set colors
     const colors = new Float32Array(pointCount * 3);
     for (let i = 0; i < pointCount; i++) {
-      colors[i * 3] = 0.7;     // R
-      colors[i * 3 + 1] = 0.7; // G
-      colors[i * 3 + 2] = 0.7; // B
+      // Default to Green to match reference
+      colors[i * 3] = 0.0;     // R
+      colors[i * 3 + 1] = 1.0; // G
+      colors[i * 3 + 2] = 0.5; // B
     }
     newGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
     const newMaterial = new THREE.PointsMaterial({
-      size: 0.05,
+      size: pointSize,
       vertexColors: true,
-      sizeAttenuation: true
+      sizeAttenuation: false, // Use screen space size (pixels)
+      map: createCircleTexture(),
+      alphaTest: 0.5,
+      transparent: true
     });
 
     setGeometry(newGeometry);
@@ -104,7 +98,15 @@ const PointCloud: React.FC<PointCloudProps> = ({
     };
   }, [data]);
 
-  // Update colors based on selection and annotations
+  // Update material size when pointSize changes
+  useEffect(() => {
+    if (material) {
+        material.size = pointSize;
+        material.needsUpdate = true;
+    }
+  }, [pointSize, material]);
+
+  // Update colors based on annotations
   useEffect(() => {
     if (!geometry) return;
 
@@ -112,11 +114,11 @@ const PointCloud: React.FC<PointCloudProps> = ({
     const colors = colorAttribute.array as Float32Array;
     const pointCount = colors.length / 3;
 
-    // Reset all colors to default
+    // Reset all colors to default (Green)
     for (let i = 0; i < pointCount; i++) {
-      colors[i * 3] = 0.7;     // R
-      colors[i * 3 + 1] = 0.7; // G
-      colors[i * 3 + 2] = 0.7; // B
+      colors[i * 3] = 0.0;     // R
+      colors[i * 3 + 1] = 1.0; // G
+      colors[i * 3 + 2] = 0.5; // B
     }
 
     // Apply annotation colors
@@ -133,63 +135,8 @@ const PointCloud: React.FC<PointCloudProps> = ({
       });
     });
 
-    // Highlight selected points
-    selectedPoints.indices.forEach(pointIndex => {
-      if (pointIndex < pointCount) {
-        colors[pointIndex * 3] = 1.0;     // R - bright red for selection
-        colors[pointIndex * 3 + 1] = 0.2; // G
-        colors[pointIndex * 3 + 2] = 0.2; // B
-      }
-    });
-
     colorAttribute.needsUpdate = true;
-  }, [geometry, annotations, selectedPoints]);
-
-  // Handle point selection
-  const handleClick = useCallback((event: ThreeEvent<MouseEvent>) => {
-    if (!isSelectionMode || !geometry || !meshRef.current) return;
-
-    event.stopPropagation();
-    
-    const rect = gl.domElement.getBoundingClientRect();
-    mouse.current.x = ((event.nativeEvent.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.current.y = -((event.nativeEvent.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.current.setFromCamera(mouse.current, camera);
-    
-    const intersects = raycaster.current.intersectObject(meshRef.current);
-    
-    if (intersects.length > 0) {
-      const intersection = intersects[0];
-      const pointIndex = intersection.index || 0;
-      
-      // Get point coordinates
-      const positionAttribute = geometry.getAttribute('position') as THREE.BufferAttribute;
-      const x = positionAttribute.getX(pointIndex);
-      const y = positionAttribute.getY(pointIndex);
-      const z = positionAttribute.getZ(pointIndex);
-
-      // Toggle point selection
-      const newSelectedIndices = [...selectedPoints.indices];
-      const newSelectedCoords = [...selectedPoints.coordinates];
-      
-      const existingIndex = newSelectedIndices.indexOf(pointIndex);
-      if (existingIndex >= 0) {
-        // Remove point
-        newSelectedIndices.splice(existingIndex, 1);
-        newSelectedCoords.splice(existingIndex, 1);
-      } else {
-        // Add point
-        newSelectedIndices.push(pointIndex);
-        newSelectedCoords.push({ x, y, z });
-      }
-
-      onPointsSelect({
-        indices: newSelectedIndices,
-        coordinates: newSelectedCoords
-      });
-    }
-  }, [isSelectionMode, geometry, selectedPoints, onPointsSelect, camera, gl]);
+  }, [geometry, annotations]);
 
   if (!geometry || !material) {
     return null;
@@ -200,44 +147,21 @@ const PointCloud: React.FC<PointCloudProps> = ({
       ref={meshRef}
       geometry={geometry}
       material={material}
-      onClick={handleClick}
-    />
-  );
-};
-
-// Selection Box Component
-const SelectionBox: React.FC<{ selectedPoints: SelectedPoints }> = ({ selectedPoints }) => {
-  if (selectedPoints.coordinates.length < 2) return null;
-
-  const positions: number[] = [];
-  selectedPoints.coordinates.forEach(point => {
-    positions.push(point.x, point.y, point.z);
-  });
-
-  return (
-    <Line
-      points={positions}
-      color="red"
-      lineWidth={2}
     />
   );
 };
 
 // Controls Component
 interface ControlsProps {
-  isSelectionMode: boolean;
-  onToggleSelection: () => void;
-  onClearSelection: () => void;
   onResetView: () => void;
-  selectedCount: number;
+  pointSize: number;
+  setPointSize: (size: number) => void;
 }
 
 const ViewerControls: React.FC<ControlsProps> = ({
-  isSelectionMode,
-  onToggleSelection,
-  onClearSelection,
   onResetView,
-  selectedCount
+  pointSize,
+  setPointSize
 }) => {
   return (
     <div style={{ 
@@ -252,28 +176,6 @@ const ViewerControls: React.FC<ControlsProps> = ({
     }}>
       <Space direction="vertical" size="small">
         <Space wrap>
-          <Tooltip title={isSelectionMode ? "切換到瀏覽模式" : "切換到選點模式"}>
-            <Button
-              type={isSelectionMode ? "primary" : "default"}
-              icon={isSelectionMode ? <SelectOutlined /> : <EyeOutlined />}
-              onClick={onToggleSelection}
-              size="small"
-            >
-              {isSelectionMode ? "選點模式" : "瀏覽模式"}
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="清空選擇">
-            <Button
-              icon={<ClearOutlined />}
-              onClick={onClearSelection}
-              disabled={selectedCount === 0}
-              size="small"
-            >
-              清空
-            </Button>
-          </Tooltip>
-
           <Tooltip title="重置視角">
             <Button
               icon={<RotateLeftOutlined />}
@@ -284,12 +186,19 @@ const ViewerControls: React.FC<ControlsProps> = ({
             </Button>
           </Tooltip>
         </Space>
-
-        {selectedCount > 0 && (
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            已選擇 {selectedCount} 個點
-          </Text>
-        )}
+        
+        <div>
+            <Text type="secondary" style={{ fontSize: '12px' }}>點大小: {pointSize}px</Text>
+            <input 
+                type="range" 
+                min="1" 
+                max="10" 
+                step="0.5" 
+                value={pointSize} 
+                onChange={(e) => setPointSize(parseFloat(e.target.value))}
+                style={{ width: '100%' }}
+            />
+        </div>
       </Space>
     </div>
   );
@@ -299,57 +208,44 @@ const ViewerControls: React.FC<ControlsProps> = ({
 const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   pointCloudData,
   annotations = [],
-  isSelectionMode = false,
-  selectedPoints = { indices: [], coordinates: [] },
-  onPointsSelect,
-  onAnnotationClick,
   width = 800,
   height = 600,
   showStats = true
 }) => {
-  const [selectionMode, setSelectionMode] = useState(isSelectionMode);
-  const [currentSelected, setCurrentSelected] = useState<SelectedPoints>(selectedPoints);
-  const controlsRef = useRef<any>();
+  const controlsRef = useRef<any>(null);
+  const [pointSize, setPointSize] = useState<number>(2); // Default 2 pixels
 
-  // Update selection mode
-  useEffect(() => {
-    setSelectionMode(isSelectionMode);
-  }, [isSelectionMode]);
-
-  // Update selected points
-  useEffect(() => {
-    setCurrentSelected(selectedPoints);
-  }, [selectedPoints]);
-
-  // Handle points selection
-  const handlePointsSelect = useCallback((points: SelectedPoints) => {
-    setCurrentSelected(points);
-    if (onPointsSelect) {
-      onPointsSelect(points);
-    }
-  }, [onPointsSelect]);
-
-  // Toggle selection mode
-  const handleToggleSelection = useCallback(() => {
-    setSelectionMode(!selectionMode);
-  }, [selectionMode]);
-
-  // Clear selection
-  const handleClearSelection = useCallback(() => {
-    const emptySelection = { indices: [], coordinates: [] };
-    setCurrentSelected(emptySelection);
-    if (onPointsSelect) {
-      onPointsSelect(emptySelection);
-    }
-    message.info('已清空選擇');
-  }, [onPointsSelect]);
-
-  // Reset view
-  const handleResetView = useCallback(() => {
+  const handleResetView = () => {
     if (controlsRef.current) {
       controlsRef.current.reset();
     }
-  }, []);
+  };
+
+  // Calculate bounds and center
+  const { center } = useMemo(() => {
+    if (!pointCloudData || pointCloudData.length === 0) {
+      return { center: [0, 0, 0] };
+    }
+    
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    for (let i = 0; i < pointCloudData.length; i += 3) {
+      const x = pointCloudData[i];
+      const y = pointCloudData[i + 1];
+      const z = pointCloudData[i + 2];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+    
+    return {
+        center: [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2]
+    };
+  }, [pointCloudData]);
 
   if (!pointCloudData || pointCloudData.length === 0) {
     return (
@@ -362,39 +258,37 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   return (
     <div style={{ position: 'relative', width, height }}>
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 75 }}
-        style={{ width: '100%', height: '100%' }}
+        camera={{ position: [0, 0, 50], fov: 60 }} // Increased distance
+        style={{ width: '100%', height: '100%', background: 'black' }} // Set black background
       >
         <ambientLight intensity={0.6} />
         <directionalLight position={[10, 10, 5]} intensity={0.8} />
         
-        <PointCloud
-          data={pointCloudData}
-          annotations={annotations}
-          isSelectionMode={selectionMode}
-          selectedPoints={currentSelected}
-          onPointsSelect={handlePointsSelect}
-          onAnnotationClick={onAnnotationClick || (() => {})}
-        />
-        
-        <SelectionBox selectedPoints={currentSelected} />
+        {/* Center the group and apply rotation */}
+        <group rotation={[0, 0, -Math.PI / 2]}>
+          <group position={[-center[0], -center[1], -center[2]]}>
+              <PointCloud
+                data={pointCloudData}
+                annotations={annotations}
+                pointSize={pointSize}
+              />
+          </group>
+        </group>
         
         <OrbitControls
           ref={controlsRef}
           enableDamping
           dampingFactor={0.05}
-          enableZoom={!selectionMode}
-          enablePan={!selectionMode}
-          enableRotate={!selectionMode}
+          enableZoom={true}
+          enablePan={true}
+          enableRotate={true}
         />
       </Canvas>
 
       <ViewerControls
-        isSelectionMode={selectionMode}
-        onToggleSelection={handleToggleSelection}
-        onClearSelection={handleClearSelection}
         onResetView={handleResetView}
-        selectedCount={currentSelected.indices.length}
+        pointSize={pointSize}
+        setPointSize={setPointSize}
       />
 
       {showStats && (
@@ -410,7 +304,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
         }}>
           <div>點數: {Math.floor(pointCloudData.length / 3).toLocaleString()}</div>
           <div>標注: {annotations.length}</div>
-          <div>已選: {currentSelected.indices.length}</div>
         </div>
       )}
     </div>

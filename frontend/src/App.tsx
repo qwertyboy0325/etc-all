@@ -5,13 +5,10 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
-import PointCloudViewerPage from './pages/PointCloudViewer';
 import TaskManagement from './pages/TaskManagement';
 import AnnotationPage from './pages/AnnotationPage';
 import ProjectManagement from './pages/ProjectManagement';
-import ReviewDashboard from './pages/ReviewDashboard';
-import NotificationCenter from './pages/NotificationCenter';
-import PointCloudConfigDemo from './pages/PointCloudConfigDemo';
+import ProcessingDashboard from './pages/ProcessingDashboard';
 import MyTasks from './pages/MyTasks';
 import UserManagement from './pages/UserManagement';
 import './App.css';
@@ -81,22 +78,6 @@ function App() {
                 } 
               />
               <Route 
-                path="/viewer" 
-                element={
-                  <ProtectedRoute>
-                    <PointCloudViewerPage />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/pointcloud-config" 
-                element={
-                  <ProtectedRoute>
-                    <PointCloudConfigDemo />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
                 path="/projects/:projectId/tasks" 
                 element={
                   <ProtectedRoute>
@@ -129,18 +110,10 @@ function App() {
                 } 
               />
               <Route 
-                path="/reviews" 
+                path="/processing" 
                 element={
                   <ProtectedRoute>
-                    <ReviewDashboard />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/notifications" 
-                element={
-                  <ProtectedRoute>
-                    <NotificationCenter />
+                    <ProcessingDashboard />
                   </ProtectedRoute>
                 } 
               />

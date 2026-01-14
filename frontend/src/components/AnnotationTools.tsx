@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Card,
   Select,
-  Slider,
   Input,
   Button,
   Space,
   Typography,
   Form,
-  message,
+  App,
   Tooltip,
   Divider,
   Tag,
@@ -40,7 +39,7 @@ interface Annotation {
   vehicleTypeId?: string;
   confidence?: number;
   notes?: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'needs_revision';
+  status: 'draft' | 'submitted';
 }
 
 interface SelectedPoints {
@@ -71,8 +70,8 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
   onPointsSelect: _onPointsSelect,
   disabled = false
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
-  const [confidence, setConfidence] = useState<number>(0.8);
   const [notes, setNotes] = useState<string>('');
   const [vehicleTypeId, setVehicleTypeId] = useState<string>();
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
@@ -81,12 +80,10 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
   useEffect(() => {
     if (annotation) {
       setVehicleTypeId(annotation.vehicleTypeId);
-      setConfidence(annotation.confidence || 0.8);
       setNotes(annotation.notes || '');
       
       form.setFieldsValue({
         vehicleTypeId: annotation.vehicleTypeId,
-        confidence: annotation.confidence || 0.8,
         notes: annotation.notes || ''
       });
     }
@@ -99,7 +96,7 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
       
       const annotationData = {
         vehicleTypeId: values.vehicleTypeId,
-        confidence: values.confidence,
+        confidence: 1.0, // Default confidence
         notes: values.notes,
         annotation_data: {
           selected_points: selectedPoints.indices,
@@ -116,7 +113,7 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
     }
   };
 
-  // Handle submit for review
+      // Handle submit for review
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -126,24 +123,18 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
         return;
       }
 
-      if (selectedPoints.indices.length === 0) {
-        message.error('請先選擇點雲區域');
-        return;
-      }
-
       const annotationData = {
         vehicleTypeId: values.vehicleTypeId,
-        confidence: values.confidence,
+        confidence: 1.0, // Default confidence
         notes: values.notes,
         annotation_data: {
-          selected_points: selectedPoints.indices,
-          point_coordinates: selectedPoints.coordinates,
+          // No points selection needed
           selection_timestamp: new Date().toISOString()
         }
       };
 
       onSubmit(annotationData);
-      message.success('標注已提交審核');
+      message.success('標注已提交處理');
     } catch (error) {
       console.error('Submit error:', error);
       message.error('提交失敗，請檢查必填項目');
@@ -162,17 +153,16 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
   const getStatusInfo = (status: string) => {
     const statusMap = {
       draft: { color: 'default', text: '草稿' },
-      submitted: { color: 'processing', text: '審核中' },
-      approved: { color: 'success', text: '已通過' },
-      rejected: { color: 'error', text: '已拒絕' },
-      needs_revision: { color: 'warning', text: '需修改' }
+      submitted: { color: 'success', text: '已完成' },
     };
     return statusMap[status as keyof typeof statusMap] || { color: 'default', text: '未知' };
   };
 
   const statusInfo = annotation ? getStatusInfo(annotation.status) : null;
-  const canEdit = !annotation || ['draft', 'needs_revision'].includes(annotation.status);
-  const isFormDisabled = disabled || !canEdit || isLoading;
+  // Allow editing if draft OR submitted (revert flow)
+  // const canEdit = !annotation || ['draft', 'needs_revision'].includes(annotation.status);
+  const canEdit = true; // Always allow edit, backend handles revert
+  const isFormDisabled = disabled || isLoading;
 
   return (
     <Card 
@@ -187,13 +177,6 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
       }
       size="small"
       style={{ width: '100%', maxWidth: 400 }}
-      extra={
-        <Tooltip title="選中的點數">
-          <Tag icon={<EyeOutlined />} color="blue">
-            {selectedPoints.indices.length} 點
-          </Tag>
-        </Tooltip>
-      }
     >
       <Form
         form={form}
@@ -202,30 +185,7 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
         disabled={isFormDisabled}
       >
         {/* 點選狀態 */}
-        <div style={{ marginBottom: 16 }}>
-          <Text type="secondary">選擇狀態：</Text>
-          <Space>
-            <Button 
-              size="small"
-              type={isSelectionMode ? "primary" : "default"}
-              onClick={() => setIsSelectionMode(!isSelectionMode)}
-              icon={<EyeOutlined />}
-            >
-              {isSelectionMode ? '選點模式' : '瀏覽模式'}
-            </Button>
-          </Space>
-          
-          {selectedPoints.indices.length > 0 && (
-            <div style={{ marginTop: 8 }}>
-              <Progress
-                percent={Math.min((selectedPoints.indices.length / 1000) * 100, 100)}
-                size="small"
-                format={() => `${selectedPoints.indices.length} / 推薦1000`}
-                status={selectedPoints.indices.length >= 500 ? "active" : "normal"}
-              />
-            </div>
-          )}
-        </div>
+        {/* Removed point selection UI as per requirement */}
 
         <Divider style={{ margin: '12px 0' }} />
 
@@ -264,42 +224,6 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
           </Select>
         </Form.Item>
 
-        {/* 信心度滑桿 */}
-        <Form.Item
-          label={
-            <Space>
-              信心度
-              <Tooltip title="對此標注結果的信心程度 (0-100%)">
-                <InfoCircleOutlined style={{ color: '#999' }} />
-              </Tooltip>
-            </Space>
-          }
-          name="confidence"
-        >
-          <div>
-            <Slider
-              min={0}
-              max={1}
-              step={0.01}
-              value={confidence}
-              onChange={(value) => setConfidence(value)}
-              marks={{
-                0: '0%',
-                0.5: '50%',
-                1: '100%'
-              }}
-              tooltip={{
-                formatter: (value) => `${Math.round((value || 0) * 100)}%`
-              }}
-            />
-            <div style={{ textAlign: 'center', marginTop: 4 }}>
-              <Text strong style={{ fontSize: '16px' }}>
-                {Math.round(confidence * 100)}%
-              </Text>
-            </div>
-          </div>
-        </Form.Item>
-
         {/* 備註 */}
         <Form.Item
           label="備註"
@@ -326,7 +250,9 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
                 loading={isLoading}
                 disabled={isFormDisabled}
               >
-                保存草稿
+                {annotation?.status === 'submitted' 
+                  ? '修改 (退回草稿)' 
+                  : '保存草稿'}
               </Button>
               
               <Button
@@ -334,9 +260,11 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
                 icon={<SendOutlined />}
                 onClick={handleSubmit}
                 loading={isLoading}
-                disabled={isFormDisabled || !vehicleTypeId || selectedPoints.indices.length === 0}
+                disabled={isFormDisabled || !vehicleTypeId}
               >
-                提交審核
+                {annotation?.status === 'submitted' 
+                  ? '重新提交' 
+                  : '提交處理'}
               </Button>
             </Space>
 
@@ -361,7 +289,7 @@ const AnnotationTools: React.FC<AnnotationToolsProps> = ({
       <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
         <Text type="secondary" style={{ fontSize: '12px' }}>
           💡 使用提示：
-          <br />• 先在3D視圖中選擇車輛區域的點雲
+          <br />• 觀察3D視圖中的車輛
           <br />• 選擇對應的車種類型
           <br />• 調整信心度反映標注準確性
           <br />• 可添加備註說明特殊情況

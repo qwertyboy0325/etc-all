@@ -39,8 +39,9 @@ api_router.include_router(annotations_router, tags=["Annotations"])
 # Include vehicle types routes
 api_router.include_router(vehicle_types_router, tags=["Vehicle Types"])
 
-# Include other route modules (to be implemented)
-# from app.api.v1.users import router as users_router
+from app.api.v1.users import router as users_router
+api_router.include_router(users_router, prefix="/users", tags=["Users"])
+
 # from app.api.v1.annotations import router as annotations_router
 
 # api_router.include_router(users_router, prefix="/users", tags=["Users"])

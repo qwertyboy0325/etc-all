@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Card, Table, Tag, Space, Button, Typography, Select, Input, message, Popconfirm, Modal } from 'antd';
-import Navbar from '../components/Navbar';
+import { Card, Table, Tag, Space, Button, Typography, Select, Input, message, Popconfirm, Modal, Form, Switch } from 'antd';
+import { UserAddOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import PageLayout from '../components/common/PageLayout';
 import { apiCall } from '../utils/api';
 import { usePermissions } from '../contexts/AuthContext';
 
-const { Content } = Layout;
 const { Title } = Typography;
 
 type GlobalRole = 'system_admin' | 'admin' | 'user';
@@ -26,6 +27,7 @@ const roleColor: Record<GlobalRole, string> = {
 
 const UserManagement: React.FC = () => {
   const { isAdmin, isSystemAdmin } = usePermissions();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
@@ -33,6 +35,17 @@ const UserManagement: React.FC = () => {
   const [assignModal, setAssignModal] = useState<{ open: boolean; user?: UserRow }>({ open: false });
   const [projectOptions, setProjectOptions] = useState<{ label: string; value: string }[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
+  
+  // Create User State
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm] = Form.useForm();
+
+  useEffect(() => {
+    if (!isAdmin && !isSystemAdmin) {
+      message.error('您沒有權限訪問此頁面');
+      navigate('/');
+    }
+  }, [isAdmin, isSystemAdmin, navigate]);
 
   const load = async () => {
     if (!isAdmin && !isSystemAdmin) return;
@@ -75,6 +88,25 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleCreateUser = async () => {
+    try {
+      const values = await createForm.validateFields();
+      const payload = {
+        ...values,
+        confirm_password: values.confirmPassword // Map confirmPassword to snake_case
+      };
+      delete payload.confirmPassword; // Remove original key
+
+      await apiCall('/users', { method: 'POST', body: JSON.stringify(payload) });
+      message.success('使用者建立成功');
+      setCreateModalOpen(false);
+      createForm.resetFields();
+      load();
+    } catch (e: any) {
+      message.error(e?.message || '建立使用者失敗');
+    }
+  };
+
   const updateRole = async (userId: string, newRole: GlobalRole) => {
     try {
       await apiCall(`/users/${userId}/role?new_role=${newRole}`, { method: 'PUT' });
@@ -96,31 +128,42 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      <Navbar />
-      <Content style={{ padding: '24px', paddingTop: '88px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Title level={2} style={{ margin: 0 }}>使用者管理</Title>
-            <Space>
-              <Input placeholder="搜尋 email / 姓名" value={q} onChange={(e) => setQ(e.target.value)} allowClear style={{ width: 220 }} />
-              <Select<GlobalRole>
-                placeholder="角色"
-                allowClear
-                value={role}
-                onChange={(v) => setRole(v)}
-                style={{ width: 160 }}
-                options={[
-                  { value: 'system_admin', label: '系統管理員' },
-                  { value: 'admin', label: '管理員' },
-                  { value: 'user', label: '一般使用者' },
-                ]}
-              />
-              <Button type="primary" onClick={load}>搜尋</Button>
-            </Space>
-          </div>
+    <PageLayout
+      title="使用者管理"
+      extra={
+        isSystemAdmin && (
+          <Button type="primary" icon={<UserAddOutlined />} onClick={() => setCreateModalOpen(true)}>
+            新增使用者
+          </Button>
+        )
+      }
+    >
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
+        <Space>
+          <Input 
+            placeholder="搜尋 email / 姓名" 
+            value={q} 
+            onChange={(e) => setQ(e.target.value)} 
+            allowClear 
+            style={{ width: 220 }} 
+          />
+          <Select<GlobalRole>
+            placeholder="角色"
+            allowClear
+            value={role}
+            onChange={(v) => setRole(v)}
+            style={{ width: 160 }}
+            options={[
+              { value: 'system_admin', label: '系統管理員' },
+              { value: 'admin', label: '管理員' },
+              { value: 'user', label: '一般使用者' },
+            ]}
+          />
+          <Button type="primary" onClick={load}>搜尋</Button>
+        </Space>
+      </div>
 
-          <Card>
+      <Card bordered={false} style={{ borderRadius: 12, boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }}>
             <Table
               rowKey="id"
               loading={loading}
@@ -180,9 +223,56 @@ const UserManagement: React.FC = () => {
               optionFilterProp="label"
             />
           </Modal>
-        </div>
-      </Content>
-    </Layout>
+
+          <Modal
+            title="新增使用者"
+            open={createModalOpen}
+            onOk={handleCreateUser}
+            onCancel={() => setCreateModalOpen(false)}
+            okText="建立"
+            cancelText="取消"
+          >
+            <Form form={createForm} layout="vertical">
+                <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: '請輸入有效的 Email' }]}>
+                    <Input placeholder="user@example.com" />
+                </Form.Item>
+                <Form.Item name="full_name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
+                    <Input placeholder="全名" />
+                </Form.Item>
+                <Form.Item name="password" label="密碼" rules={[{ required: true, min: 8, message: '密碼至少需 8 碼' }]}>
+                    <Input.Password />
+                </Form.Item>
+                <Form.Item 
+                    name="confirmPassword" 
+                    label="確認密碼" 
+                    dependencies={['password']}
+                    rules={[
+                        { required: true, message: '請確認密碼' },
+                        ({ getFieldValue }) => ({
+                            validator(_, value) {
+                                if (!value || getFieldValue('password') === value) {
+                                    return Promise.resolve();
+                                }
+                                return Promise.reject(new Error('密碼不一致'));
+                            },
+                        }),
+                    ]}
+                >
+                    <Input.Password />
+                </Form.Item>
+                <Form.Item name="global_role" label="系統角色" initialValue="user">
+                    <Select>
+                        <Select.Option value="user">一般使用者 (User)</Select.Option>
+                        <Select.Option value="admin">管理員 (Admin)</Select.Option>
+                        <Select.Option value="system_admin">系統管理員 (System Admin)</Select.Option>
+                    </Select>
+                </Form.Item>
+                <Form.Item name="is_active" label="狀態" initialValue={true} valuePropName="checked">
+                    <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+                </Form.Item>
+            </Form>
+          </Modal>
+    </PageLayout>
   );
 };
 

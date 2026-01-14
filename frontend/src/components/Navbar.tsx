@@ -155,24 +155,6 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               </Button>
               <Button 
                 type="text" 
-                onClick={() => navigate('/viewer')}
-                style={{ 
-                  color: location.pathname === '/viewer' ? '#1890ff' : undefined 
-                }}
-              >
-                點雲查看器
-              </Button>
-              <Button 
-                type="text" 
-                onClick={() => navigate('/pointcloud-config')}
-                style={{ 
-                  color: location.pathname === '/pointcloud-config' ? '#1890ff' : undefined 
-                }}
-              >
-                點雲配置
-              </Button>
-              <Button 
-                type="text" 
                 onClick={() => navigate('/projects')}
                 style={{ 
                   color: location.pathname === '/projects' ? '#1890ff' : undefined 
@@ -191,21 +173,12 @@ const Navbar: React.FC<NavbarProps> = ({ title = 'ETC 點雲標注系統' }) => 
               </Button>
               <Button 
                 type="text" 
-                onClick={() => navigate('/reviews')}
+                onClick={() => navigate('/processing')}
                 style={{ 
-                  color: location.pathname === '/reviews' ? '#1890ff' : undefined 
+                  color: location.pathname === '/processing' ? '#1890ff' : undefined 
                 }}
               >
-                審核中心
-              </Button>
-              <Button 
-                type="text" 
-                onClick={() => navigate('/notifications')}
-                style={{ 
-                  color: location.pathname === '/notifications' ? '#1890ff' : undefined 
-                }}
-              >
-                通知中心
+                處理中心
               </Button>
               {(isAdmin || isSystemAdmin) && (
                 <Button 

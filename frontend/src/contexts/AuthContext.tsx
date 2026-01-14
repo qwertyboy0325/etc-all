@@ -18,7 +18,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, fullName: string) => Promise<boolean>;
+  register: (email: string, password: string, confirmPassword: string, fullName: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
   checkAuth: () => void;
@@ -138,13 +138,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // Register function (real API only)
-  const register = async (email: string, password: string, fullName: string): Promise<boolean> => {
+  const register = async (email: string, password: string, confirmPassword: string, fullName: string): Promise<boolean> => {
     try {
       const baseUrl = apiConfig.getConfig().baseUrl;
       const response = await fetch(`${baseUrl}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName })
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          confirm_password: confirmPassword, 
+          full_name: fullName 
+        })
       });
 
       if (!response.ok) {
@@ -232,7 +237,8 @@ export const usePermissions = () => {
   return {
     isAdmin,
     isSystemAdmin,
-    canCreateProjects: isAdmin || isSystemAdmin,
+    canCreateProjects: isSystemAdmin, // Only System Admin can create projects
+    canManageProjects: isAdmin || isSystemAdmin, // Admins can manage (edit, settings)
     canManageUsers: isSystemAdmin,
     canAccessSystem: user?.isActive ?? false,
   };

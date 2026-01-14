@@ -9,6 +9,8 @@ export interface FileInfo {
   filename: string;
   original_filename: string;
   file_size: number;
+  status: string;
+  point_count?: number;
   upload_completed_at: string | null;
   created_at: string;
 }
@@ -220,4 +222,40 @@ export function validateFileFormat(filename: string): boolean {
   const validExtensions = ['.npy', '.npz'];
   const extension = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   return validExtensions.includes(extension);
+}
+
+// Local Import Types & Functions
+
+export interface LocalFolderItem {
+  name: string;
+  path: string;
+  has_files: boolean;
+  subdirs: LocalFolderItem[];
+}
+
+/**
+ * List local folders (admin only)
+ */
+export async function getLocalFolders(path: string = ''): Promise<LocalFolderItem[]> {
+  const response = await fetch(`${API_BASE_URL}/local-folders?path=${encodeURIComponent(path)}`, {
+    headers: getAuthHeaders()
+  });
+  if (!response.ok) throw new Error(`Failed to list folders: HTTP ${response.status}`);
+  return await response.json();
+}
+
+/**
+ * Import local files to project
+ */
+export async function importLocalFiles(projectId: string, sourcePath: string, recursive: boolean = false): Promise<FileUploadResponse[]> {
+  const response = await fetch(`${API_BASE_URL}/projects/${projectId}/files/import-local`, {
+    method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ source_path: sourcePath, recursive })
+  });
+  if (!response.ok) throw new Error(`Import failed: HTTP ${response.status}`);
+  return await response.json();
 } 

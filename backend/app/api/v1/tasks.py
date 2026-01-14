@@ -1,7 +1,7 @@
 """Task management API endpoints."""
 
 import logging
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,6 +18,8 @@ from app.models.enums import ProjectRole, TaskPriority, TaskStatus
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.task import (
+    BatchTaskCreate,
+    ImportAndCreateTasksRequest,
     TaskAssignment,
     TaskCreate,
     TaskFilter,
@@ -28,6 +30,7 @@ from app.schemas.task import (
     TaskUpdate,
 )
 from app.services.task import TaskService
+from app.worker import import_and_create_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +88,155 @@ async def create_task(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Task creation failed",
+        )
+
+
+@router.post(
+    "/projects/{project_id}/tasks/batch",
+    response_model=List[TaskResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Create batch tasks",
+    description="Create multiple annotation tasks from a list of files.",
+)
+async def create_batch_tasks(
+    project_id: UUID,
+    batch_data: BatchTaskCreate,
+    current_user: User = Depends(get_current_active_user),
+    task_service: TaskService = Depends(get_task_service),
+    project: Project = Depends(validate_project_exists),
+    _: bool = Depends(require_project_access(ProjectRole.PROJECT_ADMIN)),
+) -> List[TaskResponse]:
+    """
+    Create multiple annotation tasks efficiently.
+
+    **Required permissions**: Project ADMIN
+
+    **Parameters**:
+    - **file_ids**: List of point cloud file IDs
+    - **name_prefix**: Prefix for task names (if filename not used)
+    - **priority**: Task priority
+    - **max_annotations**: Max annotations per task
+    - **require_review**: Review required
+    - **due_date**: Optional due date
+    - **instructions**: Special instructions
+    """
+    try:
+        tasks = await task_service.create_batch_tasks(
+            project_id=project_id,
+            file_ids=batch_data.file_ids,
+            creator_id=current_user.id,
+            name_prefix=batch_data.name_prefix,
+            priority=batch_data.priority,
+            max_annotations=batch_data.max_annotations,
+            require_review=batch_data.require_review,
+            due_date=batch_data.due_date,
+            instructions=batch_data.instructions,
+            assignee_ids=batch_data.assignee_ids,
+            distribute_equally=batch_data.distribute_equally,
+        )
+
+        task_responses = [TaskResponse.model_validate(t) for t in tasks]
+        logger.info(
+            f"Batch created {len(tasks)} tasks in project {project_id} by {current_user.email}"
+        )
+        return task_responses
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch task creation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Batch task creation failed",
+        )
+
+
+@router.post(
+    "/projects/{project_id}/tasks/import-folder",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Import folder and create tasks",
+    description="Import files from server folder and automatically create tasks.",
+)
+async def import_folder_and_create_tasks(
+    project_id: UUID,
+    request: ImportAndCreateTasksRequest,
+    current_user: User = Depends(get_current_active_user),
+    project: Project = Depends(validate_project_exists),
+    _: bool = Depends(require_project_access(ProjectRole.PROJECT_ADMIN)),
+):
+    """
+    Trigger background task to import folder and create tasks.
+    """
+    try:
+        # Prepare task settings dict
+        task_settings = {
+            "name_prefix": request.name_prefix,
+            "priority": request.priority.value,
+            "max_annotations": request.max_annotations,
+            "require_review": request.require_review,
+            "due_date": request.due_date.isoformat() if request.due_date else None,
+            "instructions": request.instructions,
+            "assignee_ids": [str(uid) for uid in request.assignee_ids] if request.assignee_ids else None,
+            "distribute_equally": request.distribute_equally,
+        }
+
+        task = import_and_create_tasks.delay(
+            project_id=str(project_id),
+            source_path=request.source_path,
+            recursive=request.recursive,
+            creator_id=str(current_user.id),
+            task_settings=task_settings,
+        )
+        
+        return {
+            "message": "Import and task creation started",
+            "task_id": task.id,
+            "status": "processing"
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to trigger import task: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to start import process",
+        )
+
+
+@router.get(
+    "/projects/{project_id}/tasks/stats",
+    response_model=TaskStats,
+    summary="Get task statistics",
+    description="Get task statistics for a project.",
+)
+async def get_task_stats(
+    project_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    task_service: TaskService = Depends(get_task_service),
+    project: Project = Depends(validate_project_exists),
+    _: bool = Depends(require_project_access(ProjectRole.VIEWER)),
+) -> TaskStats:
+    """
+    Get task statistics for a project.
+
+    **Required permissions**: Project VIEWER or higher
+
+    **Returns**:
+    - Total tasks count
+    - Tasks by status breakdown
+    - Overdue tasks count
+    - Overall completion rate
+    """
+    try:
+        stats = await task_service.get_task_stats(project_id=project_id)
+
+        logger.info(f"Retrieved task stats for project {project_id}")
+        return stats
+
+    except Exception as e:
+        logger.error(f"Error retrieving task stats for project {project_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve task statistics",
         )
 
 
@@ -501,6 +653,52 @@ async def update_task_status(
         )
 
 
+@router.post(
+    "/projects/{project_id}/tasks/{task_id}/recalculate-status",
+    status_code=status.HTTP_200_OK,
+    summary="Recalculate task status",
+    description="Force recalculation of task status based on annotation progress.",
+)
+async def recalculate_task_status(
+    project_id: UUID,
+    task_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    task_service: TaskService = Depends(get_task_service),
+    project: Project = Depends(validate_project_exists),
+    _: bool = Depends(require_project_access(ProjectRole.ANNOTATOR)),
+):
+    """
+    Force recalculation of task status based on annotation progress.
+    Useful if status gets out of sync.
+    """
+    try:
+        from app.services.annotation import AnnotationService
+        # Initialize AnnotationService
+        annotation_service = AnnotationService(task_service.db)
+        
+        # We need to access the private method _update_task_progress or expose it
+        # Since it is private, let's just implement the logic here or make it public.
+        # Better: expose it in AnnotationService.
+        # But for now, we can instantiate AnnotationService and call the internal method
+        # (Python allows this, though it's not clean).
+        # Or better, we add a public method `refresh_task_progress` to AnnotationService.
+        
+        # Let's assume we rename it to public `update_task_progress` in next step.
+        # For now, call the private one.
+        await annotation_service._update_task_progress(task_id)
+        
+        # Fetch updated task
+        task = await task_service.get_task_by_id(task_id)
+        return {"message": "Task status recalculated", "status": task.status}
+
+    except Exception as e:
+        logger.error(f"Error recalculating task status {task_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to recalculate status: {str(e)}",
+        )
+
+
 # User Tasks Endpoints
 
 
@@ -550,39 +748,3 @@ async def get_my_tasks(
 # Statistics Endpoints
 
 
-@router.get(
-    "/projects/{project_id}/tasks/stats",
-    response_model=TaskStats,
-    summary="Get task statistics",
-    description="Get task statistics for a project.",
-)
-async def get_task_stats(
-    project_id: UUID,
-    current_user: User = Depends(get_current_active_user),
-    task_service: TaskService = Depends(get_task_service),
-    project: Project = Depends(validate_project_exists),
-    _: bool = Depends(require_project_access(ProjectRole.VIEWER)),
-) -> TaskStats:
-    """
-    Get task statistics for a project.
-
-    **Required permissions**: Project VIEWER or higher
-
-    **Returns**:
-    - Total tasks count
-    - Tasks by status breakdown
-    - Overdue tasks count
-    - Overall completion rate
-    """
-    try:
-        stats = await task_service.get_task_stats(project_id=project_id)
-
-        logger.info(f"Retrieved task stats for project {project_id}")
-        return stats
-
-    except Exception as e:
-        logger.error(f"Error retrieving task stats for project {project_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve task statistics",
-        )

@@ -6,12 +6,12 @@ services:
     image: postgres:13-alpine
     container_name: etc_postgres_prod
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-etc_pointcloud_prod}
-      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     networks:
       - app_network
     restart: unless-stopped
@@ -26,7 +26,7 @@ services:
     image: redis:7-alpine
     container_name: etc_redis_prod
     volumes:
-      - redis_data:/data
+      - ./data/redis:/data
     networks:
       - app_network
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
-      - minio_data:/data
+      - ./data/minio:/data
     networks:
       - app_network
     restart: unless-stopped
@@ -65,26 +65,28 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:-etc_pointcloud_prod}
-      - DB_USER=${POSTGRES_USER:-root}
+      - DB_NAME=${POSTGRES_DB}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - SEED_ADMIN=true
-      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL:-admin@etc.com}
+      - FIRST_SUPERUSER_EMAIL=${FIRST_SUPERUSER_EMAIL}
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
-      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME:-Admin}
+      - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
       - MINIO_HOST=minio
       - MINIO_PORT=9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET:-pointcloud-files}
+      - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_SECURE=false
       - DEBUG=False
       - ENVIRONMENT=production
       - SECRET_KEY=${SECRET_KEY}
-      - BACKEND_CORS_ORIGINS=["http://localhost"]
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
+      - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH}
+    volumes:
+      - "./training-data:/data/datasets"
     networks:
       - app_network
     depends_on:
@@ -111,21 +113,26 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:-etc_pointcloud_prod}
-      - DB_USER=${POSTGRES_USER:-root}
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
       - MINIO_HOST=minio
       - MINIO_PORT=9000
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET:-pointcloud-files}
+      - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_SECURE=false
       - DEBUG=False
       - ENVIRONMENT=production
       - SECRET_KEY=${SECRET_KEY}
+      - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH}
+      # Explicitly set DATABASE_URL for worker/async context if needed by libs
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    volumes:
+      - "./training-data:/data/datasets"
     networks:
       - app_network
     depends_on:
@@ -171,14 +178,6 @@ services:
       - frontend
       - api
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  minio_data:
-    driver: local
 
 networks:
   app_network:

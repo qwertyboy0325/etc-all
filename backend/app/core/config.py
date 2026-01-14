@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Union
 
+import os
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings
 
@@ -130,14 +131,18 @@ class Settings(BaseSettings):
         "http://192.168.0.104:3000",
         "http://192.168.0.104:3001",
         "http://192.168.0.104:3002",  # 添加新的端口
+        # Allow any origin in dev if needed, or better, add specific ones dynamically
     ]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
         """Parse CORS origins."""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
+        if isinstance(v, str):
+            if v.strip() == "*":
+                return ["*"]
+            if not v.startswith("["):
+                return [i.strip() for i in v.split(",")]
         elif isinstance(v, (list, str)):
             return v
         raise ValueError(v)
@@ -172,6 +177,39 @@ class Settings(BaseSettings):
     # Background Tasks
     TASK_TIMEOUT: int = 300  # seconds
     MAX_RETRIES: int = 3
+    DATASET_EXPORT_PATH: Optional[str] = None
+
+    @field_validator("DATASET_EXPORT_PATH", mode="before")
+    @classmethod
+    def assemble_export_path(cls, v: Optional[str], info) -> str:
+        """
+        Determine dataset export path.
+        Priority: Env Var > User's Dev Path > ./exports
+        """
+        # 1. If environment variable provided, use it
+        if isinstance(v, str):
+            return v
+        
+        # 2. Try specific local path for dev convenience (User's specific path)
+        dev_path = "/Volumes/Crutial X10/Pointnet_Pointnet2_pytorch-master/training-data"
+        if os.path.exists(dev_path):
+            return dev_path
+
+        # Get backend root directory (3 levels up from core/config.py)
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+            # 3. Check for 'training-data' in project root (parent of backend)
+            project_root = os.path.dirname(base_dir)
+            project_training_data = os.path.join(project_root, "training-data")
+            if os.path.exists(project_training_data):
+                return project_training_data
+
+            # 4. Fallback to local 'exports' directory in backend root
+            export_dir = os.path.join(base_dir, "exports")
+            return export_dir
+        except Exception:
+            return "/tmp/exports"  # Absolute fallback
 
     # Development Tools
     ENABLE_DOCS: bool = True
@@ -185,7 +223,8 @@ class Settings(BaseSettings):
     class Config:
         """Pydantic configuration."""
 
-        env_file = ".env"
+        # Only load .env in non-production environments
+        env_file = ".env" if os.getenv("ENVIRONMENT", "development") != "production" else None
         case_sensitive = True
 
 

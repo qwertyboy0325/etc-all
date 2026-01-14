@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Layout,
   Typography,
   Card,
   Button,
@@ -9,9 +8,9 @@ import {
   Tag,
   Modal,
   Form,
-  Input,
-  Select,
-  message,
+  Input, 
+  Select, 
+  App, 
   Popconfirm,
   Row,
   Col,
@@ -32,12 +31,13 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '../contexts/AuthContext';
-import Navbar from '../components/Navbar';
+import PageLayout from '../components/common/PageLayout';
 import { apiCall } from '../utils/api';
 import { uploadProjectFile, uploadProjectFiles, uploadProjectArchive, type FileUploadResponse } from '../services/fileService';
+import { VehicleTypeManager } from '../components/VehicleTypeManager';
+import { ProjectMemberManager } from '../components/ProjectMemberManager';
 import type { ColumnsType } from 'antd/es/table';
 
-const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
@@ -64,9 +64,10 @@ interface ProjectFormData {
 }
 
 const ProjectManagement: React.FC = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { canCreateProjects, isSystemAdmin } = usePermissions();
+  const { canCreateProjects, canManageProjects, isSystemAdmin } = usePermissions();
 
   // State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -76,31 +77,23 @@ const ProjectManagement: React.FC = () => {
   const [form] = Form.useForm();
   const [uploading, setUploading] = useState(false);
   const [bulkTargetProjectId, setBulkTargetProjectId] = useState<string | null>(null);
-  const [assignAdminOpen, setAssignAdminOpen] = useState<{open: boolean, projectId?: string}>({ open: false });
-  const [assignUserId, setAssignUserId] = useState<string | undefined>();
-  const [userOptions, setUserOptions] = useState<{label: string, value: string}[]>([]);
+  
+  // Members Modal State
+  const [membersVisible, setMembersVisible] = useState(false);
+  const [currentMembersProject, setCurrentMembersProject] = useState<Project | null>(null);
 
-  const openAssignAdmin = async (projectId: string) => {
-    setAssignAdminOpen({ open: true, projectId });
-    setAssignUserId(undefined);
-    try {
-      const data = await apiCall('/users');
-      const opts = (Array.isArray(data) ? data : data.items || []).map((u: any) => ({ label: u.full_name || u.email, value: u.id }));
-      setUserOptions(opts);
-    } catch (e: any) {
-      message.error(e?.message || '載入使用者失敗');
-    }
+  const openMembers = (project: Project) => {
+    setCurrentMembersProject(project);
+    setMembersVisible(true);
   };
+  
+  // Settings Modal State
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [currentSettingsProject, setCurrentSettingsProject] = useState<Project | null>(null);
 
-  const doAssignAdmin = async () => {
-    if (!assignAdminOpen.projectId || !assignUserId) return;
-    try {
-      await apiCall(`/projects/${assignAdminOpen.projectId}/members/assign-admin?user_id=${assignUserId}`, { method: 'POST' });
-      message.success('已指派為專案管理員');
-      setAssignAdminOpen({ open: false });
-    } catch (e: any) {
-      message.error(e?.message || '指派失敗');
-    }
+  const openSettings = (project: Project) => {
+    setCurrentSettingsProject(project);
+    setSettingsVisible(true);
   };
 
   // Load projects
@@ -312,67 +305,8 @@ const ProjectManagement: React.FC = () => {
               onClick={() => navigate(`/projects/${record.id}/tasks`)}
             />
           </Tooltip>
-          {canCreateProjects && (
-            <>
-              <Upload
-                multiple
-                disabled={uploading}
-                beforeUpload={() => false}
-                showUploadList={false}
-                onChange={async (info) => {
-                  const files = info.fileList.map(f => f.originFileObj as File).filter(Boolean);
-                  if (!files.length) return;
-                  setUploading(true);
-                  setBulkTargetProjectId(record.id);
-                  try {
-                    const resps: FileUploadResponse[] = await uploadProjectFiles(record.id, files);
-                    message.success(`已上傳 ${resps.length} 個文件`);
-                  } catch (e: any) {
-                    message.error(e?.message || '批量上傳失敗');
-                  } finally {
-                    setUploading(false);
-                    setBulkTargetProjectId(null);
-                  }
-                }}
-              >
-                <Tooltip title="批量上傳點雲">
-                  <Button type="text" loading={uploading && bulkTargetProjectId===record.id}>
-                    上傳
-                  </Button>
-                </Tooltip>
-              </Upload>
-
-              <Upload
-                accept=".zip"
-                disabled={uploading}
-                beforeUpload={() => false}
-                showUploadList={false}
-                onChange={async (info) => {
-                  const zip = info.file.originFileObj as File;
-                  if (!zip) return;
-                  setUploading(true);
-                  setBulkTargetProjectId(record.id);
-                  try {
-                    const resps = await uploadProjectArchive(record.id, zip);
-                    message.success(`ZIP 解析成功，上傳 ${resps.length} 個文件`);
-                  } catch (e: any) {
-                    message.error(e?.message || 'ZIP 上傳失敗');
-                  } finally {
-                    setUploading(false);
-                    setBulkTargetProjectId(null);
-                  }
-                }}
-              >
-                <Tooltip title="上傳ZIP (含多個NPY/NPZ)">
-                  <Button type="text" loading={uploading && bulkTargetProjectId===record.id}>
-                    上傳ZIP
-                  </Button>
-                </Tooltip>
-              </Upload>
-            </>
-          )}
           
-          {canCreateProjects && (
+          {canManageProjects && (
             <>
               <Tooltip title="編輯專案">
                 <Button
@@ -382,38 +316,39 @@ const ProjectManagement: React.FC = () => {
                 />
               </Tooltip>
               
-              <Tooltip title="專案設置">
+              <Tooltip title="專案設置 (標籤管理)">
                 <Button
                   type="text"
                   icon={<SettingOutlined />}
-                  onClick={() => {
-                    message.info('專案設置功能開發中...');
-                  }}
+                  onClick={() => openSettings(record)}
                 />
               </Tooltip>
               
-              <Popconfirm
-                title="確定要删除這個專案嗎？"
-                description="删除後無法恢復，請謹慎操作。"
-                onConfirm={() => handleDelete(record.id)}
-                okText="删除"
-                cancelText="取消"
-                okType="danger"
-              >
-                <Tooltip title="删除專案">
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                  />
-                </Tooltip>
-              </Popconfirm>
-              {isSystemAdmin && (
-                <Tooltip title="指派管理員">
-                  <Button type="text" onClick={() => openAssignAdmin(record.id)}>
-                    指派管理員
-                  </Button>
-                </Tooltip>
+              <Tooltip title="成員管理">
+                <Button
+                  type="text"
+                  icon={<TeamOutlined />}
+                  onClick={() => openMembers(record)}
+                />
+              </Tooltip>
+              
+              {canCreateProjects && (
+                <Popconfirm
+                  title="確定要删除這個專案嗎？"
+                  description="删除後無法恢復，請謹慎操作。"
+                  onConfirm={() => handleDelete(record.id)}
+                  okText="删除"
+                  cancelText="取消"
+                  okType="danger"
+                >
+                  <Tooltip title="删除專案">
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
               )}
             </>
           )}
@@ -430,36 +365,28 @@ const ProjectManagement: React.FC = () => {
     : 0;
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      <Navbar />
-      
-      <Content style={{ padding: '24px', paddingTop: '88px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          {/* Header */}
-          <Row justify="space-between" align="middle" style={{ marginBottom: '24px' }}>
-            <Col>
-              <Title level={2} style={{ margin: 0 }}>
-                <FileTextOutlined style={{ marginRight: '12px' }} />
-                專案管理
-              </Title>
-              <Text type="secondary">管理和監控所有點雲標注專案</Text>
-            </Col>
-            <Col>
-              {canCreateProjects && (
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => openModal()}
-                  size="large"
-                >
-                  創建專案
-                </Button>
-              )}
-              {/* Debug: canCreateProjects = {String(canCreateProjects)}, user role = {user?.globalRole} */}
-            </Col>
-          </Row>
-
-          {/* Statistics */}
+    <PageLayout
+      title={
+        <Space>
+          <FileTextOutlined />
+          專案管理
+        </Space>
+      }
+      subtitle="管理和監控所有點雲標注專案"
+      extra={
+        canCreateProjects && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => openModal()}
+            size="large"
+          >
+            創建專案
+          </Button>
+        )
+      }
+    >
+      {/* Statistics */}
           <Row gutter={16} style={{ marginBottom: '24px' }}>
             <Col xs={12} sm={6}>
               <Card>
@@ -502,7 +429,7 @@ const ProjectManagement: React.FC = () => {
           </Row>
 
           {/* Projects Table */}
-          <Card>
+          <Card bordered={false} style={{ borderRadius: '12px', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }}>
             <Table
               columns={columns}
               dataSource={projects}
@@ -588,30 +515,32 @@ const ProjectManagement: React.FC = () => {
             </Form>
           </Modal>
 
-          {/* Assign Admin Modal */}
+          {/* Project Members Modal */}
+          {membersVisible && currentMembersProject && (
+            <ProjectMemberManager
+              projectId={currentMembersProject.id}
+              canManage={canManageProjects}
+              visible={membersVisible}
+              onClose={() => setMembersVisible(false)}
+            />
+          )}
+
+          {/* Project Settings Modal (Vehicle Types) */}
           <Modal
-            title="指派專案管理員"
-            open={assignAdminOpen.open}
-            onCancel={() => setAssignAdminOpen({ open: false })}
-            onOk={doAssignAdmin}
-            okText="指派"
+            title={currentSettingsProject ? `Project Settings: ${currentSettingsProject.name}` : 'Project Settings'}
+            open={settingsVisible}
+            onCancel={() => setSettingsVisible(false)}
+            footer={null}
+            width={800}
           >
-            <Form layout="vertical">
-              <Form.Item label="選擇使用者">
-                <Select
-                  showSearch
-                  placeholder="搜尋使用者"
-                  options={userOptions}
-                  value={assignUserId}
-                  onChange={setAssignUserId as any}
-                  optionFilterProp="label"
+            {settingsVisible && currentSettingsProject && (
+                <VehicleTypeManager 
+                    projectId={currentSettingsProject.id} 
+                    canManage={canCreateProjects} 
                 />
-              </Form.Item>
-            </Form>
+            )}
           </Modal>
-        </div>
-      </Content>
-    </Layout>
+    </PageLayout>
   );
 };
 

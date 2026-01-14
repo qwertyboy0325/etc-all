@@ -25,6 +25,10 @@ from app.schemas.project import (
     ProjectUpdate,
 )
 from app.services.project import ProjectService
+from app.worker import export_dataset
+from app.models.project import Project
+from app.models.enums import ProjectRole
+from app.api.deps import require_project_access
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +243,43 @@ async def delete_project(
 
 
 # Project Members Management
+
+
+@router.post("/{project_id}/export", status_code=status.HTTP_202_ACCEPTED)
+async def export_project_dataset(
+    project_id: UUID,
+    auto_train: bool = Query(False, description="自動開始訓練"),
+    current_user: User = Depends(get_current_active_user),
+    project: Project = Depends(validate_project_exists),
+    _: bool = Depends(require_project_access(ProjectRole.PROJECT_ADMIN)),
+):
+    """
+    Trigger dataset export for a project.
+    Exports all SUBMITTED annotations to a folder structure.
+    
+    如果 auto_train=true，導出完成後會自動開始訓練模型。
+    """
+    from app.worker import train_model
+    from celery import chain
+    
+    if auto_train:
+        # 使用 Celery chain 串聯導出和訓練任務
+        task = chain(
+            export_dataset.s(str(project_id)),
+            train_model.s()
+        ).apply_async()
+        return {
+            "task_id": task.id,
+            "status": "processing",
+            "message": "數據導出已開始，完成後將自動訓練模型"
+        }
+    else:
+        task = export_dataset.delay(str(project_id))
+        return {
+            "task_id": task.id,
+            "status": "processing",
+            "message": "Dataset export started"
+        }
 
 
 @router.get("/{project_id}/members", response_model=ProjectMemberListResponse)

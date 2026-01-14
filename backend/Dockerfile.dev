@@ -51,8 +51,7 @@ RUN mkdir -p /app/static
 # Set permissions
 RUN chmod +x /app
 
-# Install pre-commit hooks (if .pre-commit-config.yaml exists)
-RUN if [ -f .pre-commit-config.yaml ]; then pre-commit install; fi
+# Skip pre-commit hook installation in container builds to avoid git dependency
 
 # Expose port
 EXPOSE 8000

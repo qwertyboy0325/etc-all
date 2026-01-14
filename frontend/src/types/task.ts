@@ -47,9 +47,8 @@ export interface Task {
   assigned_at?: string;
   created_by: string;
   
-  // Point cloud file
-  pointcloud_file_id: string;
-  pointcloud_file?: PointCloudFile;
+  // Point cloud files
+  files: PointCloudFile[];
   
   // Completion info
   completed_at?: string;
@@ -73,7 +72,7 @@ export interface Task {
 export interface TaskCreate {
   name: string;
   description?: string;
-  pointcloud_file_id: string;
+  file_ids: string[];
   priority?: TaskPriority;
   max_annotations?: number;
   require_review?: boolean;
@@ -131,12 +130,15 @@ export interface TaskStats {
 export interface TaskFormData {
   name: string;
   description: string;
-  pointcloud_file_id: string;
+  pointcloud_file_ids?: string[];
+  pointcloudFileId?: string; // Legacy support or for single file selection
   priority: TaskPriority;
   max_annotations: number;
   require_review: boolean;
   due_date?: Date;
   instructions: string;
+  assigneeIds?: string[];
+  distributeEqually?: boolean;
 }
 
 export interface TaskCardProps {
@@ -176,8 +178,8 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   [TaskStatus.PENDING]: '待分配',
   [TaskStatus.ASSIGNED]: '已分配',
   [TaskStatus.IN_PROGRESS]: '進行中',
-  [TaskStatus.COMPLETED]: '已完成',
-  [TaskStatus.REVIEWED]: '已審核',
+  [TaskStatus.COMPLETED]: '待處理', // Changed from 已完成 to 待處理 based on user request "Pending Processing"
+  [TaskStatus.REVIEWED]: '已完成', // This is the final state
   [TaskStatus.REJECTED]: '被拒絕',
   [TaskStatus.CANCELLED]: '已取消'
 };

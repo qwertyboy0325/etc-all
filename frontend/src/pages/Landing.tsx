@@ -2,11 +2,9 @@ import React, { useEffect } from 'react';
 import { Layout, Card, Row, Col, Typography, Space, Button, Statistic } from 'antd';
 import { 
   ProjectOutlined, 
-  UserOutlined, 
   FileTextOutlined,
   SettingOutlined,
-  CheckCircleOutlined,
-  BellOutlined
+  RocketOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '../contexts/AuthContext';
@@ -45,22 +43,10 @@ const Landing: React.FC = () => {
       action: () => navigate('/tasks')
     },
     {
-      title: '點雲查看器',
-      description: '查看和分析點雲數據',
-      icon: <UserOutlined style={{ fontSize: '24px', color: '#fa8c16' }} />,
-      action: () => navigate('/viewer')
-    },
-    {
-      title: '審核中心',
-      description: '審核標注結果和質量控制',
-      icon: <CheckCircleOutlined style={{ fontSize: '24px', color: '#722ed1' }} />,
-      action: () => navigate('/reviews')
-    },
-    {
-      title: '通知中心',
-      description: '查看系統通知和消息',
-      icon: <BellOutlined style={{ fontSize: '24px', color: '#eb2f96' }} />,
-      action: () => navigate('/notifications')
+      title: '處理中心',
+      description: '導出數據並訓練 PointNet 模型',
+      icon: <RocketOutlined style={{ fontSize: '24px', color: '#722ed1' }} />,
+      action: () => navigate('/processing')
     }
   ];
 
@@ -154,15 +140,6 @@ const Landing: React.FC = () => {
                   onClick={() => navigate('/tasks')}
                 >
                   我的任務
-                </Button>
-              </Col>
-              <Col span={6}>
-                <Button 
-                  type="link" 
-                  block 
-                  onClick={() => navigate('/viewer')}
-                >
-                  點雲查看器
                 </Button>
               </Col>
               <Col span={6}>

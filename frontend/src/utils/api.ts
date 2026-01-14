@@ -38,7 +38,8 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'API Error' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+      // FastAPI returns 'detail', generic APIs might return 'message'
+      throw new Error(error.detail || error.message || `HTTP ${response.status}`);
     }
 
     return response.json();

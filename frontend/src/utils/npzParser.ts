@@ -78,8 +78,11 @@ export async function parseNpzFile(buffer: ArrayBuffer): Promise<ParsedNpzData> 
       pointCloudKey
     };
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to parse NPZ file:', error);
+    if (error.message && error.message.includes("Can't find end of central directory")) {
+        console.error("This often means the file is truncated or not a valid ZIP file. Received bytes:", buffer.byteLength);
+    }
     throw new Error(`Failed to parse NPZ file: ${error}`);
   }
 }

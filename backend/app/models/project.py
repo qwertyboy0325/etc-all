@@ -58,6 +58,12 @@ class Project(BaseUUIDModel):
     auto_assign_tasks = Column(Boolean, default=True, nullable=False)
     require_review = Column(Boolean, default=True, nullable=False)
 
+    # Processing Status
+    is_processing = Column(Boolean, default=False, nullable=False)
+    last_processed_at = Column(DateTime, nullable=True)
+    processing_status = Column(String(50), nullable=True) # e.g. "pending", "running", "completed", "failed"
+    processing_error = Column(Text, nullable=True)
+
     # Relationships
     creator = relationship(
         "User", back_populates="created_projects", foreign_keys=[created_by]

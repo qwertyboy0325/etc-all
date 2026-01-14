@@ -1,8 +1,10 @@
 """Main FastAPI application module."""
 
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import FastAPI, Request, Response, status
@@ -47,6 +49,16 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up ETC Point Cloud Annotation System...")
 
     try:
+        # Ensure export directories exist
+        if settings.DATASET_EXPORT_PATH:
+            try:
+                base_path = Path(settings.DATASET_EXPORT_PATH)
+                for subdir in ["raw_data", "exports", "checkpoints"]:
+                    (base_path / subdir).mkdir(parents=True, exist_ok=True)
+                logger.info(f"Initialized dataset directories at {settings.DATASET_EXPORT_PATH}")
+            except Exception as e:
+                logger.error(f"Failed to initialize dataset directories: {e}")
+
         # Initialize database
         await init_db()
         logger.info("Database initialized successfully")
@@ -131,19 +143,16 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "http://localhost:3002",  # 添加3002端口
+        "http://localhost:3002",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002",  # 添加3002端口
+        "http://127.0.0.1:3002",
         "http://192.168.0.104:3000",
         "http://192.168.0.104:3001",
-        "http://192.168.0.104:3002",  # 添加3002端口
-    ]
-    + [
-        str(origin) for origin in settings.BACKEND_CORS_ORIGINS
-    ],  # 同時使用config中的設定
+        "http://192.168.0.104:3002",
+    ] + ([str(origin) for origin in settings.BACKEND_CORS_ORIGINS] if settings.BACKEND_CORS_ORIGINS != ["*"] else ["*"]),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["*"], # Allow all methods
     allow_headers=["*"],
 )
 

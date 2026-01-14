@@ -36,8 +36,8 @@ class TaskBase(BaseModel):
 class TaskCreate(TaskBase):
     """Schema for creating a new task."""
 
-    pointcloud_file_id: UUID = Field(
-        ..., description="Point cloud file ID for this task"
+    file_ids: List[UUID] = Field(
+        ..., min_length=1, description="List of point cloud file IDs for this task"
     )
 
     @field_validator("name")
@@ -55,6 +55,35 @@ class TaskCreate(TaskBase):
         if v and v <= datetime.utcnow():
             raise ValueError("Due date must be in the future")
         return v
+
+
+class BatchTaskCreate(BaseModel):
+    """Schema for creating multiple tasks."""
+    file_ids: List[UUID] = Field(..., min_length=1, description="List of file IDs")
+    name_prefix: str = Field("Task", min_length=1, description="Prefix for task names")
+    priority: TaskPriority = TaskPriority.MEDIUM
+    max_annotations: int = 3
+    require_review: bool = True
+    due_date: Optional[datetime] = None
+    instructions: Optional[str] = None
+    assignee_ids: Optional[List[UUID]] = Field(None, description="List of user IDs to assign tasks to")
+    distribute_equally: bool = Field(False, description="If True, distribute tasks among assignees. If False, assign all tasks to all assignees.")
+
+
+class ImportAndCreateTasksRequest(BaseModel):
+    """Schema for importing a folder and automatically creating tasks."""
+    source_path: str = Field(..., description="Source folder path (relative to raw_data)")
+    recursive: bool = Field(False, description="Whether to scan recursively")
+    
+    # Task creation settings
+    name_prefix: str = Field("Task", min_length=1)
+    priority: TaskPriority = TaskPriority.MEDIUM
+    max_annotations: int = 3
+    require_review: bool = True
+    due_date: Optional[datetime] = None
+    instructions: Optional[str] = None
+    assignee_ids: Optional[List[UUID]] = None
+    distribute_equally: bool = False
 
 
 class TaskUpdate(BaseModel):
@@ -150,9 +179,8 @@ class TaskResponse(BaseModel):
     assigned_at: Optional[datetime]
     created_by: UUID
 
-    # Point cloud file
-    pointcloud_file_id: UUID
-    pointcloud_file: Optional[PointCloudFileSummary] = None
+    # Point cloud files
+    files: List[PointCloudFileSummary] = []
 
     # Completion info
     completed_at: Optional[datetime]

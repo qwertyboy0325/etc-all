@@ -116,19 +116,30 @@ class ProjectService:
     ) -> ProjectListResponse:
         """Get projects for a specific user with filtering and pagination."""
         try:
-            # Base query for user's projects
-            query = (
-                select(Project)
-                .join(ProjectMember)
-                .where(
-                    and_(
-                        ProjectMember.user_id == user_id,
-                        ProjectMember.is_active == True,
-                        Project.is_active == True,
-                    )
+            # Check if user is admin/system_admin
+            user = await self.db.get(User, user_id)
+            # Only System Admin sees all active projects
+            if user and user.is_system_admin:
+                # System Admin sees all active projects
+                query = (
+                    select(Project)
+                    .where(Project.is_active == True)
+                    .options(selectinload(Project.creator))
                 )
-                .options(selectinload(Project.creator))
-            )
+            else:
+                # Base query for user's projects (including regular Admins)
+                query = (
+                    select(Project)
+                    .join(ProjectMember)
+                    .where(
+                        and_(
+                            ProjectMember.user_id == user_id,
+                            ProjectMember.is_active == True,
+                            Project.is_active == True,
+                        )
+                    )
+                    .options(selectinload(Project.creator))
+                )
 
             # Apply filters
             if filters:
@@ -486,6 +497,11 @@ class ProjectService:
 
     async def _user_can_manage_project(self, user_id: UUID, project_id: UUID) -> bool:
         """Check if user can manage project (admin or creator)."""
+        # System Admin has implicit access
+        user = await self.db.get(User, user_id)
+        if user and user.is_system_admin:
+            return True
+
         # Check if user is project admin or creator
         result = await self.db.execute(
             select(ProjectMember).where(

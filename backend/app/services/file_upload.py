@@ -113,8 +113,29 @@ class FileUploadService:
                 data = np.load(BytesIO(content))
             elif file_extension == ".npz":
                 npz_data = np.load(BytesIO(content))
-                # Take the first array if multiple arrays exist
-                data = npz_data[list(npz_data.keys())[0]]
+                # Intelligent key selection for point cloud data
+                data = None
+                
+                # 1. Look for common names
+                for key in ['points', 'pts', 'data', 'xyz', 'lidar', 'vertex']:
+                    if key in npz_data:
+                        data = npz_data[key]
+                        break
+                
+                # 2. If not found, look for first 2D array with 3+ columns
+                if data is None:
+                    for key in npz_data.keys():
+                        arr = npz_data[key]
+                        if hasattr(arr, 'ndim') and arr.ndim == 2 and arr.shape[1] >= 3:
+                            data = arr
+                            break
+                            
+                # 3. Fallback to first key if nothing matches criteria
+                if data is None and len(npz_data.keys()) > 0:
+                    data = npz_data[list(npz_data.keys())[0]]
+                    
+                if data is None:
+                    raise ValueError("Empty or invalid NPZ file")
             else:
                 # For other formats, return basic info
                 return {
@@ -225,15 +246,16 @@ class FileUploadService:
 
             # Update file record with analysis results
             pointcloud_file.mark_upload_completed()
+            pointcloud_file.mark_processing_completed() # Mark as PROCESSED
             pointcloud_file.set_point_cloud_metadata(
                 point_count=analysis_result["point_count"],
                 dimensions=analysis_result["dimensions"],
                 bounding_box=analysis_result["bounding_box"],
             )
-
+            
             await self.db.commit()
             await self.db.refresh(pointcloud_file)
-
+            
             return pointcloud_file
 
         except Exception as e:
@@ -255,6 +277,82 @@ class FileUploadService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Upload failed: {e}",
             )
+
+    async def import_local_file(
+        self,
+        file_path: Path,
+        project_id: UUID,
+        uploaded_by: UUID,
+    ) -> PointCloudFile:
+        """Import a file from local filesystem."""
+        if not file_path.exists() or not file_path.is_file():
+            raise ValueError(f"File not found: {file_path}")
+
+        filename = file_path.name
+        file_ext = file_path.suffix.lower()
+        
+        if file_ext not in self.allowed_extensions:
+            raise ValueError(f"Unsupported file type: {file_ext}")
+
+        # Read content
+        content = file_path.read_bytes()
+        checksum = self._calculate_checksum(content)
+        
+        # Storage path
+        storage_path = self._get_storage_path(project_id, filename)
+        
+        # Create DB record
+        pointcloud_file = PointCloudFile(
+            project_id=project_id,
+            filename=Path(storage_path).name,
+            original_filename=filename,
+            file_path=storage_path,
+            file_size=len(content),
+            file_extension=file_ext,
+            mime_type="application/octet-stream",
+            uploaded_by=uploaded_by,
+            checksum=checksum,
+            status=FileStatus.UPLOADING,
+            upload_started_at=datetime.utcnow(),
+        )
+        
+        try:
+            self.db.add(pointcloud_file)
+            await self.db.commit()
+            await self.db.refresh(pointcloud_file)
+            
+            # Save to MinIO
+            await self._save_to_storage(content, storage_path)
+            
+            # Analyze
+            analysis_result = await self._analyze_point_cloud(content, file_ext)
+            
+            # Update record
+            pointcloud_file.mark_upload_completed()
+            pointcloud_file.mark_processing_completed() # Mark as PROCESSED
+            pointcloud_file.set_point_cloud_metadata(
+                point_count=analysis_result["point_count"],
+                dimensions=analysis_result["dimensions"],
+                bounding_box=analysis_result["bounding_box"],
+            )
+            
+            await self.db.commit()
+            await self.db.refresh(pointcloud_file)
+            
+            return pointcloud_file
+            
+        except Exception as e:
+            await self.db.rollback()
+            # Try cleanup
+            try:
+                self.minio_client.remove_object(settings.MINIO_BUCKET, storage_path)
+            except:
+                pass
+                
+            if pointcloud_file.id:
+                pointcloud_file.mark_processing_failed(str(e))
+                await self.db.commit()
+            raise e
 
     async def get_file_by_id(self, file_id: UUID) -> Optional[PointCloudFile]:
         """Get point cloud file by ID."""

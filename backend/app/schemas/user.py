@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.models.enums import GlobalRole
+
 
 class UserBase(BaseModel):
     """Base user schema with common fields."""
@@ -32,6 +34,12 @@ class UserCreate(UserBase):
     def validate_passwords_match(self) -> bool:
         """Validate that passwords match."""
         return self.password == self.confirm_password
+
+
+class UserCreateAdmin(UserCreate):
+    """Schema for admin creating user."""
+    global_role: Optional[GlobalRole] = Field(default=GlobalRole.USER, description="User global role")
+    is_active: bool = True
 
 
 class UserLogin(BaseModel):

@@ -14,6 +14,7 @@ interface TaskBoardProps {
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
   projectId: string;
   onDelete?: (taskId: string) => void;
+  onView?: (task: Task) => void;
 }
 
 interface TaskCardProps {
@@ -21,9 +22,10 @@ interface TaskCardProps {
   onStatusChange?: (taskId: string, status: TaskStatus) => void;
   onDelete?: (taskId: string) => void;
   onAssignClick?: (taskId: string) => void;
+  onClick?: () => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete, onAssignClick }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete, onAssignClick, onClick }) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('zh-TW');
@@ -38,9 +40,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete, onAssignClick }) =>
       style={{ 
         marginBottom: '8px',
         border: isOverdue ? '1px solid #ff4d4f' : undefined,
-        boxShadow: isOverdue ? '0 2px 4px rgba(255, 77, 79, 0.2)' : undefined
+        boxShadow: isOverdue ? '0 2px 4px rgba(255, 77, 79, 0.2)' : undefined,
+        cursor: onClick ? 'pointer' : 'default'
       }}
       bodyStyle={{ padding: '12px' }}
+      onClick={onClick}
     >
       <div style={{ marginBottom: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -99,15 +103,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete, onAssignClick }) =>
         </Space>
 
         <div>
-          {task.pointcloud_file && (
-            <Tooltip title={task.pointcloud_file.original_filename}>
-              <Badge 
-                count={task.pointcloud_file.point_count || 0} 
-                showZero={false}
-                style={{ backgroundColor: '#52c41a' }}
-              />
+          {task.files && task.files.length > 0 ? (
+            <Tooltip title={task.files.map(f => f.original_filename).join(', ')}>
+               <Tag icon={<AlertTriangle style={{ width: 12, height: 12 }} />} color="blue">
+                  {task.files.length} 檔案
+               </Tag>
             </Tooltip>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -135,8 +137,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onDelete, onAssignClick }) =>
 
       {/* Actions */}
       {(onAssignClick || onDelete) && (
-        <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          {onAssignClick && (
+        <div 
+          style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end', gap: 8 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onAssignClick && !task.assigned_to && (
             <Tooltip title="指派給成員">
               <Button type="text" size="small" onClick={() => onAssignClick(task.id)}>
                 指派
@@ -160,7 +165,8 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
   tasks,
   onDelete,
   onAssign,
-  projectId
+  projectId,
+  onView
 }) => {
   const [assignModal, setAssignModal] = React.useState<{ open: boolean; taskId?: string }>({ open: false });
   const [members, setMembers] = React.useState<{ label: string; value: string }[]>([]);
@@ -216,15 +222,15 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
       },
       {
         key: TaskStatus.COMPLETED,
-        title: TASK_STATUS_LABELS[TaskStatus.COMPLETED],
+        title: '待處理', // Override to be explicit
         tasks: groupedTasks[TaskStatus.COMPLETED] || [],
-        color: TASK_STATUS_COLORS[TaskStatus.COMPLETED]
+        color: 'orange' // Change color to orange for pending processing
       },
       {
         key: TaskStatus.REVIEWED,
-        title: TASK_STATUS_LABELS[TaskStatus.REVIEWED],
+        title: '已完成', // Merged Reviewed/Completed concept
         tasks: groupedTasks[TaskStatus.REVIEWED] || [],
-        color: TASK_STATUS_COLORS[TaskStatus.REVIEWED]
+        color: 'green'
       }
     ];
   }, [tasks]);
@@ -234,73 +240,92 @@ const TaskBoard: React.FC<TaskBoardProps> = ({
   };
 
   return (
-    <div style={{ 
-      display: 'grid', 
-      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
-      gap: '16px',
-      minHeight: '600px',
-      paddingBottom: '24px'
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ 
+        display: 'flex', 
+        gap: '16px',
+        overflowX: 'auto',
+        paddingBottom: '12px',
+        minHeight: '400px',
+        alignItems: 'stretch'
+      }}>
       {columns.map((column) => (
-        <Card
-          key={column.key}
-          title={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Space>
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  backgroundColor: column.color
-                }} />
-                <span>{column.title}</span>
-              </Space>
-              <Badge 
-                count={column.tasks.length} 
-                showZero 
-                style={{ backgroundColor: column.color }}
-              />
-            </div>
-          }
-          size="small"
-          style={{ 
-            height: 'fit-content',
-            minHeight: '400px'
-          }}
-          bodyStyle={{ 
-            padding: '8px',
-            backgroundColor: '#fafafa',
-            minHeight: '350px'
-          }}
-        >
-          <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-            {column.tasks.length === 0 ? (
-              <div style={{ 
-                textAlign: 'center', 
-                padding: '20px',
-                color: '#999'
-              }}>
-                <Text type="secondary">暫無任務</Text>
-              </div>
-            ) : (
-              column.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onDelete={onDelete}
-                  onAssignClick={onAssign ? openAssign : undefined}
+        <div key={column.key} style={{ 
+          flex: '0 0 320px', 
+          width: '320px',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <Card
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Space>
+                  <div style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: column.color
+                  }} />
+                  <span style={{ fontWeight: 600 }}>{column.title}</span>
+                </Space>
+                <Badge 
+                  count={column.tasks.length} 
+                  showZero 
+                  style={{ backgroundColor: column.color, boxShadow: 'none' }}
                 />
-              ))
-            )}
-          </div>
-        </Card>
+              </div>
+            }
+            size="small"
+            bordered={false}
+            style={{ 
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              backgroundColor: '#f4f5f7',
+              borderRadius: '12px'
+            }}
+            headStyle={{
+                borderBottom: 'none',
+                backgroundColor: 'transparent',
+                padding: '12px 12px 0 12px',
+                minHeight: 'auto'
+            }}
+            bodyStyle={{ 
+              padding: '8px 8px 8px 8px',
+              flex: 1,
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ minHeight: '100px' }}>
+              {column.tasks.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '20px',
+                  color: '#8c8c8c'
+                }}>
+                  <Text type="secondary" style={{ fontSize: '13px' }}>暫無任務</Text>
+                </div>
+              ) : (
+                column.tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onDelete={onDelete}
+                    onAssignClick={onAssign ? openAssign : undefined}
+                    onClick={() => onView?.(task)}
+                  />
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
       ))}
+      </div>
       
       {/* Summary Card */}
       <Card
         title="📊 統計總覽"
         size="small"
-        style={{ gridColumn: '1 / -1' }}
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
           <div style={{ textAlign: 'center' }}>

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
@@ -18,6 +19,20 @@ from sqlalchemy.orm import relationship
 
 from app.models.base import BaseProjectModel
 from app.models.enums import TaskPriority, TaskStatus
+
+
+# Association table for Task-File relationship
+task_files = Table(
+    "task_files",
+    BaseProjectModel.metadata,
+    Column("task_id", PostgresUUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "pointcloud_file_id",
+        PostgresUUID(as_uuid=True),
+        ForeignKey("pointcloud_files.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class Task(BaseProjectModel):
@@ -47,14 +62,12 @@ class Task(BaseProjectModel):
         PostgresUUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
 
-    # Point Cloud File
-    pointcloud_file_id = Column(
-        PostgresUUID(as_uuid=True), ForeignKey("pointcloud_files.id"), nullable=False
-    )
+    # Point Cloud Files (Many-to-Many)
+    # Removed single pointcloud_file_id
 
     # Task Settings
     max_annotations = Column(Integer, default=3, nullable=False)
-    require_review = Column(Boolean, default=True, nullable=False)
+    require_review = Column(Boolean, default=False, nullable=False)
 
     # Deadlines
     due_date = Column(DateTime, nullable=True)
@@ -79,7 +92,12 @@ class Task(BaseProjectModel):
         "User", back_populates="created_tasks", foreign_keys=[created_by]
     )
 
-    pointcloud_file = relationship("PointCloudFile", back_populates="tasks")
+    files = relationship(
+        "PointCloudFile",
+        secondary=task_files,
+        back_populates="tasks",
+        lazy="selectin"
+    )
 
     annotations = relationship(
         "Annotation", back_populates="task", cascade="all, delete-orphan"

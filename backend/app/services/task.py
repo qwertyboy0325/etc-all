@@ -1,7 +1,7 @@
 """Task management service for creating, assigning, and tracking annotation tasks."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
@@ -41,28 +41,42 @@ class TaskService:
     ) -> Task:
         """Create a new annotation task."""
         try:
-            # Verify point cloud file exists and belongs to project
-            pointcloud_file = await self.db.get(
-                PointCloudFile, task_data.pointcloud_file_id
+            # Sanitize due_date to be naive UTC if it's aware
+            if task_data.due_date and task_data.due_date.tzinfo:
+                task_data.due_date = task_data.due_date.astimezone(timezone.utc).replace(tzinfo=None)
+
+            # Verify point cloud files exist and belong to project
+            stmt = select(PointCloudFile).where(
+                and_(
+                    PointCloudFile.id.in_(task_data.file_ids),
+                    PointCloudFile.project_id == project_id
+                )
             )
-            if not pointcloud_file or pointcloud_file.project_id != project_id:
+            result = await self.db.execute(stmt)
+            files = result.scalars().all()
+
+            if len(files) != len(task_data.file_ids):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Point cloud file not found in this project",
+                    detail="One or more point cloud files not found in this project",
                 )
 
-            if not pointcloud_file.can_create_tasks():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot create tasks for this file (not processed or no points)",
-                )
+            # Check if any file cannot be used (e.g. not processed)
+            # Skip this check or update it. Multi-file task might allow some processing files?
+            # Ideally all should be processed.
+            for f in files:
+                if not f.can_create_tasks():
+                     raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"File {f.original_filename} is not ready for task creation",
+                    )
 
             # Create task
             db_task = Task(
                 project_id=project_id,
                 name=task_data.name,
                 description=task_data.description,
-                pointcloud_file_id=task_data.pointcloud_file_id,
+                # No pointcloud_file_id
                 priority=task_data.priority or TaskPriority.MEDIUM,
                 max_annotations=task_data.max_annotations or 3,
                 require_review=(
@@ -75,11 +89,19 @@ class TaskService:
                 created_by=creator_id,
                 status=TaskStatus.PENDING,
             )
+            
+            # Associate files
+            db_task.files = files
 
             self.db.add(db_task)
             await self.db.commit()
             await self.db.refresh(db_task)
-
+            
+            # Reload with files for response
+            # We need to return TaskResponse which has files
+            # refresh only reloads columns.
+            # But we just assigned files, so db_task.files should be available if session is active.
+            
             logger.info(f"Task created: {task_data.name} by {creator_id}")
             return db_task
 
@@ -93,6 +115,138 @@ class TaskService:
                 detail="Failed to create task",
             )
 
+    async def create_batch_tasks(
+        self,
+        project_id: UUID,
+        file_ids: List[UUID],
+        creator_id: UUID,
+        name_prefix: str,
+        priority: TaskPriority = TaskPriority.MEDIUM,
+        max_annotations: int = 3,
+        require_review: bool = True,
+        due_date: Optional[datetime] = None,
+        instructions: Optional[str] = None,
+        assignee_ids: Optional[List[UUID]] = None,
+        distribute_equally: bool = False,
+    ) -> List[Task]:
+        """Create multiple tasks efficiently."""
+        try:
+            # Sanitize due_date to be naive UTC if it's aware
+            if due_date and due_date.tzinfo:
+                due_date = due_date.astimezone(timezone.utc).replace(tzinfo=None)
+
+            # 1. Fetch all file info
+            query = select(PointCloudFile).where(
+                and_(
+                    PointCloudFile.id.in_(file_ids),
+                    PointCloudFile.project_id == project_id
+                )
+            )
+            result = await self.db.execute(query)
+            files = result.scalars().all()
+            
+            if not files:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No valid files found for task creation"
+                )
+
+            new_tasks = []
+
+            # Logic 1: Distribute Equally (Group files per assignee)
+            if distribute_equally and assignee_ids:
+                num_assignees = len(assignee_ids)
+                if num_assignees > 0:
+                    avg = len(files) // num_assignees
+                    remainder = len(files) % num_assignees
+                    
+                    start = 0
+                    for i, assignee_id in enumerate(assignee_ids):
+                        end = start + avg + (1 if i < remainder else 0)
+                        chunk_files = files[start:end]
+                        start = end
+                        
+                        if not chunk_files:
+                            continue
+                            
+                        task_name = f"{name_prefix} - Part {i+1}"
+                        
+                        task = Task(
+                            project_id=project_id,
+                            name=task_name,
+                            description=f"Batch task with {len(chunk_files)} files",
+                            priority=priority,
+                            max_annotations=max_annotations,
+                            require_review=require_review,
+                            due_date=due_date,
+                            instructions=instructions,
+                            created_by=creator_id,
+                            status=TaskStatus.ASSIGNED,
+                            assigned_to=assignee_id,
+                            assigned_at=datetime.utcnow(),
+                        )
+                        task.files = chunk_files
+                        new_tasks.append(task)
+
+            # Logic 2: Assign All to All (Replication)
+            elif not distribute_equally and assignee_ids:
+                for i, assignee_id in enumerate(assignee_ids):
+                    task_name = f"{name_prefix} - User {i+1}"
+                    
+                    task = Task(
+                        project_id=project_id,
+                        name=task_name,
+                        description=f"Batch task with {len(files)} files",
+                        priority=priority,
+                        max_annotations=max_annotations,
+                        require_review=require_review,
+                        due_date=due_date,
+                        instructions=instructions,
+                        created_by=creator_id,
+                        status=TaskStatus.ASSIGNED,
+                        assigned_to=assignee_id,
+                        assigned_at=datetime.utcnow(),
+                    )
+                    task.files = files
+                    new_tasks.append(task)
+            
+            # Logic 3: No Assignees (Create ONE unassigned task with ALL files)
+            else:
+                task_name = f"{name_prefix}"
+                task = Task(
+                    project_id=project_id,
+                    name=task_name,
+                    description=f"Batch task with {len(files)} files",
+                    priority=priority,
+                    max_annotations=max_annotations,
+                    require_review=require_review,
+                    due_date=due_date,
+                    instructions=instructions,
+                    created_by=creator_id,
+                    status=TaskStatus.PENDING,
+                )
+                task.files = files
+                new_tasks.append(task)
+
+            # 3. Bulk insert
+            self.db.add_all(new_tasks)
+            await self.db.commit()
+            
+            # 4. Refresh
+            for t in new_tasks:
+                await self.db.refresh(t)
+                
+            logger.info(f"Batch created {len(new_tasks)} tasks in project {project_id}")
+            return new_tasks
+
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Batch create error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create batch tasks: {e}"
+            )
+
     async def get_task_by_id(
         self, task_id: UUID, include_relations: bool = True
     ) -> Optional[Task]:
@@ -104,7 +258,7 @@ class TaskService:
                 query = query.options(
                     selectinload(Task.creator),
                     selectinload(Task.assignee),
-                    selectinload(Task.pointcloud_file),
+                    selectinload(Task.files),
                     selectinload(Task.annotations),
                 )
 
@@ -131,7 +285,8 @@ class TaskService:
                 .options(
                     selectinload(Task.creator),
                     selectinload(Task.assignee),
-                    selectinload(Task.pointcloud_file),
+                    selectinload(Task.files),
+                    selectinload(Task.annotations),
                 )
             )
 
@@ -206,7 +361,8 @@ class TaskService:
                 .where(Task.assigned_to == user_id)
                 .options(
                     selectinload(Task.creator),
-                    selectinload(Task.pointcloud_file),
+                    selectinload(Task.files),
+                    selectinload(Task.annotations),
                 )
             )
 
@@ -524,7 +680,10 @@ class TaskService:
             overdue_count = overdue_result.scalar()
 
             # Calculate completion rate
-            total_tasks = sum(status_counts.values())
+            total_tasks = sum(
+                count for status, count in status_counts.items()
+                if status != TaskStatus.CANCELLED.value
+            )
             completed_tasks = status_counts.get("completed", 0) + status_counts.get(
                 "reviewed", 0
             )
@@ -572,8 +731,7 @@ class TaskService:
             )
 
         try:
-            task.status = TaskStatus.CANCELLED
-            task.updated_at = datetime.utcnow()
+            await self.db.delete(task)
             await self.db.commit()
 
             logger.info(f"Task deleted: {task_id} by {user_id}")

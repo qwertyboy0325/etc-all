@@ -66,6 +66,12 @@ class ProjectResponse(ProjectBase):
     require_review: bool
     completion_rate: float
 
+    # Processing Status
+    is_processing: bool = False
+    last_processed_at: Optional[datetime] = None
+    processing_status: Optional[str] = None
+    processing_error: Optional[str] = None
+
     # Creator information
     creator: Optional[UserPublic] = None
 
