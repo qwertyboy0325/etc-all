@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
     restart: unless-stopped
@@ -24,7 +24,7 @@ services:
     image: redis:7-alpine
     container_name: etc_redis_prod
     volumes:
-      - ./data/redis:/data
+      - redis_data:/data
     networks:
       - app_network
     restart: unless-stopped
@@ -44,7 +44,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     volumes:
-      - ./data/minio:/data
+      - minio_data:/data
     networks:
       - app_network
     restart: unless-stopped
@@ -90,7 +90,7 @@ services:
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS}
       - DATASET_EXPORT_PATH=${DATASET_EXPORT_PATH:-/data/datasets}
     volumes:
-      - ./training-data:/data/datasets
+      - training_data:/data/datasets
     networks:
       - app_network
     depends_on:
@@ -145,7 +145,7 @@ services:
       - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD}
       - FIRST_SUPERUSER_NAME=${FIRST_SUPERUSER_NAME}
     volumes:
-      - ./training-data:/data/datasets
+      - training_data:/data/datasets
     networks:
       - app_network
     depends_on:
@@ -202,3 +202,12 @@ networks:
   app_network:
     driver: bridge
 
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  training_data:
+    driver: local
