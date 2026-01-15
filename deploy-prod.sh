@@ -174,7 +174,36 @@ echo ""
 
 # Pull/build images
 echo -e "${BLUE}🔨 Building/pulling images...${NC}"
-docker-compose -f docker-compose.prod.yml build --no-cache
+echo -e "${YELLOW}Using legacy Docker builder for stability...${NC}"
+
+# Use legacy builder to avoid BuildKit issues
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
+
+# Build with retries
+MAX_RETRIES=3
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if docker-compose -f docker-compose.prod.yml build --no-cache; then
+        echo -e "${GREEN}✅ Build successful${NC}"
+        break
+    else
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo -e "${YELLOW}⚠️  Build failed, retrying ($RETRY_COUNT/$MAX_RETRIES)...${NC}"
+            sleep 5
+        else
+            echo -e "${RED}❌ Build failed after $MAX_RETRIES attempts${NC}"
+            echo ""
+            echo -e "${YELLOW}Try running these commands manually:${NC}"
+            echo "  docker builder prune -f"
+            echo "  DOCKER_BUILDKIT=0 docker-compose -f docker-compose.prod.yml build --no-cache"
+            echo "  docker-compose -f docker-compose.prod.yml up -d"
+            exit 1
+        fi
+    fi
+done
 echo ""
 
 # Start services
